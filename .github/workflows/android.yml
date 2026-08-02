@@ -38,19 +38,58 @@ jobs:
       - name: Run Go tests
         run: make go-test
 
-      - name: Build APK
-        run: make headlink-debug.apk
-
       - name: Run tests
         run: make test
 
-      # The APK is the point of this workflow: a build you can install without
-      # a local Go, NDK and SDK toolchain. Retained for a month; these are
-      # ~170 MB debug builds, so keeping them forever is not free.
+      # Signing is optional so pull requests and forks — which cannot read
+      # secrets — still build and test. Only a signed release APK is worth
+      # publishing: an unsigned one will not install, and a debug one is signed
+      # with a keystore this runner generates from scratch, so it would differ
+      # on every run and could not update an existing install.
+      - name: Check for signing key
+        id: signing
+        run: |
+          if [ -n "${{ secrets.HEADLINK_KEYSTORE_BASE64 }}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No signing key configured; building a debug APK and not publishing it."
+          fi
+
+      - name: Decode signing key
+        if: steps.signing.outputs.available == 'true'
+        run: echo "${{ secrets.HEADLINK_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/headlink.jks"
+
+      - name: Build signed release APK
+        if: steps.signing.outputs.available == 'true'
+        env:
+          HEADLINK_KEYSTORE_PATH: ${{ runner.temp }}/headlink.jks
+          HEADLINK_KEYSTORE_PASSWORD: ${{ secrets.HEADLINK_KEYSTORE_PASSWORD }}
+          HEADLINK_KEY_ALIAS: ${{ secrets.HEADLINK_KEY_ALIAS }}
+          HEADLINK_KEY_PASSWORD: ${{ secrets.HEADLINK_KEY_PASSWORD }}
+        run: make release-apk
+
+      - name: Verify the APK is actually signed
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs headlink-release.apk
+
+      - name: Build debug APK
+        if: steps.signing.outputs.available != 'true'
+        run: make headlink-debug.apk
+
+      # Retained for a month; these are large builds and keeping every one
+      # forever is not free.
       - name: Upload APK
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: headlink-debug-${{ github.sha }}
-          path: headlink-debug.apk
+          name: headlink-release-${{ github.sha }}
+          path: headlink-release.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/headlink.jks"

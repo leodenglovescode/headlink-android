@@ -101,6 +101,31 @@ android {
     flavorDimensions "version"
     namespace 'com.tailscale.ipn'
 
+    // Optional release signing, driven entirely by environment variables.
+    //
+    // When they are absent — every ordinary local build, and upstream's own
+    // Play Store flow, which signs the AAB separately with jarsigner — this is
+    // inert and `release` behaves exactly as upstream leaves it. That keeps the
+    // change rebase-safe and means no key material is ever required to build.
+    //
+    // When they are present, CI and local builds produce byte-identical
+    // signatures, so a build from either can be installed over the other. An
+    // APK signed by a different key cannot update an installed app: Android
+    // rejects it, and uninstalling first destroys the app's data — which here
+    // means the Headscale registration, the stored secret and the client
+    // certificate.
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("HEADLINK_KEYSTORE_PATH")
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("HEADLINK_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("HEADLINK_KEY_ALIAS")
+                keyPassword System.getenv("HEADLINK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         applicationTest {
             initWith debug
@@ -114,6 +139,10 @@ android {
         }
         release {
             manifestPlaceholders.leanbackRequired = isTV()
+
+            if (System.getenv("HEADLINK_KEYSTORE_PATH")) {
+                signingConfig signingConfigs.release
+            }
 
             minifyEnabled true
 

@@ -37,6 +37,7 @@ endif
 ANDROID_BUILD_TOOLS_VERSION := $(shell grep '^androidBuildToolsVersion=' android/gradle.properties | cut -d'=' -f2)
 
 DEBUG_APK := headlink-debug.apk
+RELEASE_APK := headlink-release.apk
 RELEASE_AAB := tailscale-release.aab
 RELEASE_TV_AAB := tailscale-tv-release.aab
 
@@ -145,6 +146,19 @@ tailscale-debug: $(DEBUG_APK)
 $(DEBUG_APK): libtailscale debug-symbols version gradle-dependencies build-unstripped-aar
 	(cd android && ./gradlew test assembleDebug)
 	install -C android/build/outputs/apk/debug/android-debug.apk $@
+
+.PHONY: release-apk
+release-apk: $(RELEASE_APK) ## Build a signed, non-debuggable release APK for sideloading
+
+# A sideloadable release APK, as opposed to upstream's Play Store AAB.
+#
+# Signed by Gradle when the HEADLINK_KEYSTORE_* environment variables are set;
+# without them the output is unsigned and Android will refuse to install it.
+# Unlike the debug APK this is not debuggable, so the stored secret and client
+# certificate cannot be read back over adb.
+$(RELEASE_APK): libtailscale version gradle-dependencies build-unstripped-aar
+	(cd android && ./gradlew assembleRelease)
+	install -C android/build/outputs/apk/release/android-release.apk $@
 
 # Builds the release AAB and signs it (phone/tablet/chromeOS variant)
 .PHONY: release
