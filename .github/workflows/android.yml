@@ -7,6 +7,8 @@ on:
       - "release-branch/*"
   pull_request:
     # all PRs on all branches
+  workflow_dispatch:
+    # so an APK can be built on demand without pushing
 
 jobs:
   build:
@@ -36,8 +38,19 @@ jobs:
       - name: Run Go tests
         run: make go-test
 
-      - name: Build APKs
-        run: make tailscale-debug.apk
+      - name: Build APK
+        run: make headlink-debug.apk
 
       - name: Run tests
         run: make test
+
+      # The APK is the point of this workflow: a build you can install without
+      # a local Go, NDK and SDK toolchain. Retained for a month; these are
+      # ~170 MB debug builds, so keeping them forever is not free.
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: headlink-debug-${{ github.sha }}
+          path: headlink-debug.apk
+          retention-days: 30
+          if-no-files-found: error
