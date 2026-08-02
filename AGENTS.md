@@ -83,7 +83,16 @@ Plain: subject line, blank line, body. **Never** append `Co-Authored-By`, `Claud
 "Generated with" or any similar trailer.
 
 Never `git push`, force-push, `reset --hard`, delete branches, change remotes or open PRs unless
-asked in that message. Committing to the current feature branch when asked is fine.
+asked in that message. Committing when asked is fine.
+
+Work happens on `main`. Sync with upstream by rebasing, never merging, so the fork stays a clean
+stack of commits on top of upstream:
+
+```sh
+git fetch upstream
+git rebase upstream/main
+git log --oneline upstream/main..main   # the fork's entire delta
+```
 
 ## Never commit deployment specifics
 
