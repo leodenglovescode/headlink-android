@@ -4,6 +4,7 @@ package com.tailscale.ipn.ui.view
 
 import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -121,6 +122,7 @@ data class MainViewNavigation(
     val onNavigateToExitNodes: () -> Unit,
     val onNavigateToHealth: () -> Unit,
     val onNavigateToSearch: () -> Unit,
+    val onNavigateToServerSetup: () -> Unit,
 )
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -239,7 +241,7 @@ fun MainView(
                     state != Ipn.State.Stopping,
                     user,
                     { viewModel.toggleVpn(desiredState = !isOn) },
-                    { viewModel.login() },
+                    navigation.onNavigateToServerSetup,
                     loginAtUrl,
                     netmap?.SelfNode,
                     { viewModel.showVPNPermissionLauncherIfUnauthorized() })
@@ -521,8 +523,10 @@ fun ConnectView(
                 fontSize = MaterialTheme.typography.titleMedium.fontSize)
           }
         } else {
-          TailscaleLogoView(modifier = Modifier.size(50.dp))
-          Spacer(modifier = Modifier.size(1.dp))
+          Image(
+              painter = painterResource(R.drawable.ic_headlink_launcher_foreground),
+              contentDescription = null,
+              modifier = Modifier.size(72.dp))
           Text(
               text = stringResource(id = R.string.welcome_to_tailscale),
               style = MaterialTheme.typography.titleMedium,
@@ -534,9 +538,16 @@ fun ConnectView(
           Spacer(modifier = Modifier.size(1.dp))
           PrimaryActionButton(onClick = loginAction) {
             Text(
-                text = stringResource(id = R.string.log_in),
+                text = stringResource(id = R.string.headscale_connect),
                 fontSize = MaterialTheme.typography.titleMedium.fontSize)
           }
+          Spacer(modifier = Modifier.size(8.dp))
+          // Required attribution: Headlink is a BSD-3-Clause derivative, not a Tailscale product.
+          Text(
+              stringResource(R.string.headlink_attribution),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              textAlign = TextAlign.Center)
         }
       }
     }
@@ -826,7 +837,8 @@ fun MainViewPreview() {
           onNavigateToPeerDetails = {},
           onNavigateToExitNodes = {},
           onNavigateToHealth = {},
-          onNavigateToSearch = {}),
+          onNavigateToSearch = {},
+          onNavigateToServerSetup = {}),
       vm,
   )
 }

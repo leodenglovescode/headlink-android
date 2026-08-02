@@ -68,11 +68,10 @@ import com.tailscale.ipn.ui.view.AboutView
 import com.tailscale.ipn.ui.view.BugReportView
 import com.tailscale.ipn.ui.view.DNSSettingsView
 import com.tailscale.ipn.ui.view.ExitNodePicker
+import com.tailscale.ipn.ui.view.HeadscaleLoginView
 import com.tailscale.ipn.ui.view.HealthView
 import com.tailscale.ipn.ui.view.IntroView
 import com.tailscale.ipn.ui.view.LoginQRView
-import com.tailscale.ipn.ui.view.LoginWithAuthKeyView
-import com.tailscale.ipn.ui.view.LoginWithCustomControlURLView
 import com.tailscale.ipn.ui.view.MDMSettingsDebugView
 import com.tailscale.ipn.ui.view.MainView
 import com.tailscale.ipn.ui.view.MainViewNavigation
@@ -84,6 +83,7 @@ import com.tailscale.ipn.ui.view.NotificationsView
 import com.tailscale.ipn.ui.view.PeerDetails
 import com.tailscale.ipn.ui.view.PermissionsView
 import com.tailscale.ipn.ui.view.PrimaryActionButton
+import com.tailscale.ipn.ui.view.PrivateDiscoveryView
 import com.tailscale.ipn.ui.view.RunExitNodeView
 import com.tailscale.ipn.ui.view.SearchView
 import com.tailscale.ipn.ui.view.SettingsView
@@ -297,7 +297,8 @@ class MainActivity : ComponentActivity() {
                           onNavigateToSearch = {
                             viewModel.enableSearchAutoFocus()
                             navController.navigate("search")
-                          })
+                          },
+                          onNavigateToServerSetup = { navController.navigate("headscaleLogin") })
                   val settingsNav =
                       SettingsNav(
                           onNavigateToBugReport = { navController.navigate("bugReport") },
@@ -306,6 +307,9 @@ class MainActivity : ComponentActivity() {
                           onNavigateToSplitTunneling = { navController.navigate("splitTunneling") },
                           onNavigateToTailnetLock = { navController.navigate("tailnetLock") },
                           onNavigateToSubnetRouting = { navController.navigate("subnetRouting") },
+                          onNavigateToPrivateDiscovery = {
+                            navController.navigate("privateDiscovery")
+                          },
                           onNavigateToMDMSettings = { navController.navigate("mdmSettings") },
                           onNavigateToManagedBy = { navController.navigate("managedBy") },
                           onNavigateToUserSwitcher = { navController.navigate("userSwitcher") },
@@ -327,10 +331,7 @@ class MainActivity : ComponentActivity() {
                       UserSwitcherNav(
                           backToSettings = backTo("settings"),
                           onNavigateHome = backTo("main"),
-                          onNavigateCustomControl = {
-                            navController.navigate("loginWithCustomControl")
-                          },
-                          onNavigateToAuthKey = { navController.navigate("loginWithAuthKey") })
+                          onNavigateToServerSetup = { navController.navigate("headscaleLogin") })
 
                   composable("main", enterTransition = { fadeIn(animationSpec = tween(150)) }) {
                     MainView(
@@ -375,6 +376,7 @@ class MainActivity : ComponentActivity() {
                   composable("splitTunneling") { SplitTunnelAppPickerView(backTo("settings")) }
                   composable("tailnetLock") { TailnetLockSetupView(backTo("settings")) }
                   composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }
+                  composable("privateDiscovery") { PrivateDiscoveryView(backTo("settings")) }
                   composable("about") { AboutView(backTo("settings")) }
                   composable("mdmSettings") { MDMSettingsDebugView(backTo("settings")) }
                   composable("managedBy") { ManagedByView(backTo("settings")) }
@@ -395,12 +397,8 @@ class MainActivity : ComponentActivity() {
                   composable("intro", exitTransition = { fadeOut(animationSpec = tween(150)) }) {
                     IntroView(backTo("main"))
                   }
-                  composable("loginWithAuthKey") {
-                    LoginWithAuthKeyView(onNavigateHome = backTo("main"), backTo("userSwitcher"))
-                  }
-                  composable("loginWithCustomControl") {
-                    LoginWithCustomControlURLView(
-                        onNavigateHome = backTo("main"), backTo("userSwitcher"))
+                  composable("headscaleLogin") {
+                    HeadscaleLoginView(onNavigateHome = backTo("main"), backTo("userSwitcher"))
                   }
                 }
             if (isIntroScreenViewedSet()) {

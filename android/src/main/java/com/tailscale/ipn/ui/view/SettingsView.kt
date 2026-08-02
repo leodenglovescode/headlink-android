@@ -35,6 +35,7 @@ import com.tailscale.ipn.R
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.ShowHide
+import com.tailscale.ipn.privatediscovery.PrivateDiscovery
 import com.tailscale.ipn.ui.Links
 import com.tailscale.ipn.ui.theme.link
 import com.tailscale.ipn.ui.theme.listItem
@@ -65,6 +66,7 @@ fun SettingsView(
   val useTailscaleSubnets by MDMSettings.useTailscaleSubnets.flow.collectAsState()
   val isClientRemoteLoggingEnabled by viewModel.isClientRemoteLoggingEnabled.collectAsState()
   var showDisableLoggingDialog by remember { mutableStateOf(false) }
+  val isPrivateDiscoveryEnabled = remember { PrivateDiscovery.config().enabled }
 
   Scaffold(
       topBar = {
@@ -114,7 +116,17 @@ fun SettingsView(
             Setting.Text(R.string.subnet_routing, onClick = settingsNav.onNavigateToSubnetRouting)
           }
 
-          Lists.ItemDivider()
+          // Headlink: Private Headscale IPv6 Discovery.
+          Lists.SectionDivider()
+          Setting.Text(
+              R.string.private_discovery_title,
+              subtitle =
+                  stringResource(
+                      if (isPrivateDiscoveryEnabled) R.string.private_discovery_settings_subtitle_on
+                      else R.string.private_discovery_settings_subtitle_off),
+              onClick = settingsNav.onNavigateToPrivateDiscovery)
+
+          Lists.SectionDivider()
           Setting.Switch(
               R.string.client_remote_logging_enabled,
               subtitle =
@@ -278,5 +290,5 @@ fun SettingsPreview() {
   vm.tailNetLockEnabled.set(true)
   vm.isAdmin.set(true)
   vm.managedByOrganization.set("Tails and Scales Inc.")
-  SettingsView(SettingsNav({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}), vm)
+  SettingsView(SettingsNav({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}), vm)
 }

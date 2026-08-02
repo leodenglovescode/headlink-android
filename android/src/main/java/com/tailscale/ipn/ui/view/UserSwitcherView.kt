@@ -3,8 +3,6 @@
 
 package com.tailscale.ipn.ui.view
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,7 +20,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,10 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,8 +41,7 @@ import com.tailscale.ipn.ui.viewModel.UserSwitcherViewModel
 data class UserSwitcherNav(
     val backToSettings: BackNavigation,
     val onNavigateHome: () -> Unit,
-    val onNavigateCustomControl: () -> Unit,
-    val onNavigateToAuthKey: () -> Unit
+    val onNavigateToServerSetup: () -> Unit
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,11 +50,9 @@ fun UserSwitcherView(nav: UserSwitcherNav, viewModel: UserSwitcherViewModel = vi
   val users by viewModel.loginProfiles.collectAsState()
   val currentUser by viewModel.loggedInUser.collectAsState()
   val showHeaderMenu by viewModel.showHeaderMenu.collectAsState()
-  var showDeleteDialog by remember { mutableStateOf(false) }
   val context = LocalContext.current
   val netmapState by viewModel.netmap.collectAsState()
   val capabilityIsOwner = "https://tailscale.com/cap/is-owner"
-  val isOwner = netmapState?.hasCap(capabilityIsOwner) == true
 
   Scaffold(
       topBar = {
@@ -72,10 +61,7 @@ fun UserSwitcherView(nav: UserSwitcherNav, viewModel: UserSwitcherViewModel = vi
             onBack = nav.backToSettings,
             actions = {
               Row {
-                FusMenu(
-                    viewModel = viewModel,
-                    onAuthKeyClick = nav.onNavigateToAuthKey,
-                    onCustomClick = nav.onNavigateCustomControl)
+                FusMenu(viewModel = viewModel, onServerSetupClick = nav.onNavigateToServerSetup)
                 IconButton(onClick = { viewModel.showHeaderMenu.set(!showHeaderMenu) }) {
                   Icon(Icons.Default.MoreVert, "menu")
                 }
@@ -127,13 +113,7 @@ fun UserSwitcherView(nav: UserSwitcherNav, viewModel: UserSwitcherViewModel = vi
 
                 item {
                   Lists.SectionDivider()
-                  Setting.Text(R.string.add_account) {
-                    viewModel.addProfile {
-                      if (it.isFailure) {
-                        viewModel.errorDialog.set(ErrorDialogType.ADD_PROFILE_FAILED)
-                      }
-                    }
-                  }
+                  Setting.Text(R.string.add_account) { nav.onNavigateToServerSetup() }
 
                   Lists.ItemDivider()
                   Setting.Text(R.string.reauthenticate) { viewModel.login() }
@@ -152,95 +132,29 @@ fun UserSwitcherView(nav: UserSwitcherNav, viewModel: UserSwitcherViewModel = vi
                           }
                         })
                   }
-
-                  Lists.SectionDivider()
-                  Setting.Text(R.string.delete_tailnet, destructive = true) {
-                    showDeleteDialog = true
-                  }
                 }
               }
             }
       }
-
-  if (showDeleteDialog) {
-    AlertDialog(
-        onDismissRequest = { showDeleteDialog = false },
-        title = { Text(text = stringResource(R.string.delete_tailnet)) },
-        text = {
-          if (isOwner) {
-            OwnerDeleteDialogText()
-          } else {
-            Text(stringResource(R.string.request_deletion_nonowner))
-          }
-        },
-        confirmButton = {
-          TextButton(
-              onClick = {
-                val intent =
-                    Intent(Intent.ACTION_VIEW, Uri.parse("https://tailscale.com/contact/support"))
-                context.startActivity(intent)
-                showDeleteDialog = false
-              }) {
-                Text(text = stringResource(R.string.contact_support))
-              }
-        },
-        dismissButton = {
-          TextButton(onClick = { showDeleteDialog = false }) {
-            Text(text = stringResource(R.string.cancel))
-          }
-        })
-  }
 }
 
 @Composable
-fun FusMenu(
-    onCustomClick: () -> Unit,
-    onAuthKeyClick: () -> Unit,
-    viewModel: UserSwitcherViewModel
-) {
+fun FusMenu(onServerSetupClick: () -> Unit, viewModel: UserSwitcherViewModel) {
   val expanded by viewModel.showHeaderMenu.collectAsState()
 
   DropdownMenu(
       expanded = expanded,
       onDismissRequest = { viewModel.showHeaderMenu.set(false) },
       modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) {
+        // Headlink talks to one self-hosted Headscale, so there is a single entry point here
+        // rather than upstream's "alternate server" plus separate auth-key screens.
         MenuItem(
             onClick = {
-              onCustomClick()
+              onServerSetupClick()
               viewModel.showHeaderMenu.set(false)
             },
-            text = stringResource(id = R.string.custom_control_menu))
-        MenuItem(
-            onClick = {
-              onAuthKeyClick()
-              viewModel.showHeaderMenu.set(false)
-            },
-            text = stringResource(id = R.string.auth_key_menu))
+            text = stringResource(id = R.string.headscale_change_server))
       }
-}
-
-@Composable
-fun OwnerDeleteDialogText() {
-  val part1 = stringResource(R.string.request_deletion_owner_part1)
-  val part2a = stringResource(R.string.request_deletion_owner_part2a)
-  val part2b = stringResource(R.string.request_deletion_owner_part2b)
-
-  val annotatedText = buildAnnotatedString {
-    append(part1 + " ")
-
-    pushLink(LinkAnnotation.Url("https://login.tailscale.com/admin/settings/general"))
-    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-      append("Settings > General")
-    }
-    pop()
-
-    append(" $part2a\n\n") // newline after "Delete tailnet."
-    append(part2b)
-  }
-
-  Text(
-      text = annotatedText,
-      style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface))
 }
 
 @Composable
@@ -255,11 +169,6 @@ fun MenuItem(text: String, onClick: () -> Unit) {
 @Preview
 fun UserSwitcherViewPreview() {
   val vm = UserSwitcherViewModel()
-  val nav =
-      UserSwitcherNav(
-          backToSettings = {},
-          onNavigateHome = {},
-          onNavigateCustomControl = {},
-          onNavigateToAuthKey = {})
+  val nav = UserSwitcherNav(backToSettings = {}, onNavigateHome = {}, onNavigateToServerSetup = {})
   UserSwitcherView(nav, vm)
 }
