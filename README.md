@@ -1,6 +1,10 @@
+<img src="docs/assets/headlink-logo.svg" alt="" width="96" align="left" hspace="12" vspace="4">
+
 # Headlink
 
-**Headlink is an independent fork and is not an official Tailscale application.**
+**An independent fork. Not an official Tailscale application.**
+
+<br clear="left">
 
 Headlink is a personal Android client for private [Headscale](https://headscale.net) deployments,
 based on the open source [Tailscale Android client](https://github.com/tailscale/tailscale-android).
@@ -19,8 +23,16 @@ the equivalent of one `/etc/hosts` line, scoped to the coordination-server conne
 
 It never proxies or relays Tailscale traffic, never weakens TLS, and never touches the WireGuard
 data plane. See [docs/private-headscale-ipv6-discovery.md](docs/private-headscale-ipv6-discovery.md)
-for the architecture, security model, and limitations, and [AGENTS.md](AGENTS.md) for the fork's
-maintenance rules.
+for the architecture, security model, and limitations.
+
+## Documentation
+
+| | |
+| --- | --- |
+| [Private Headscale IPv6 Discovery](docs/private-headscale-ipv6-discovery.md) | How the feature works, why TLS identity is preserved by construction, the security model, and its limits |
+| [FAQ and quirks](docs/faq.md) | Android, build and deployment behaviour that wastes hours if you meet it cold |
+| [CLAUDE.md](CLAUDE.md) | Build environment, rebase-fragile touch points, rules that must not regress |
+| [AGENTS.md](AGENTS.md) | The fork's maintenance rules |
 
 Everything below is upstream documentation, kept as-is. It refers to the official Tailscale app;
 Headlink is not distributed through any of the channels it mentions, and is built from source.

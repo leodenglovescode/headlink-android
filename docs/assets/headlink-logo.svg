@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 108 108" role="img" aria-label="Headlink">
+  <!--
+    Headlink mark, mirroring android/src/main/res/drawable/ic_headlink_launcher_foreground.xml
+    on the ic_launcher_background colour. Kept in sync by hand; it is three paths.
+  -->
+  <rect width="108" height="108" rx="24" fill="#0A2622"/>
+  <!-- left stem -->
+  <path fill="#7FE3D0" d="M39,30 A6,6 0 0 1 45,36 V72 A6,6 0 0 1 39,78 A6,6 0 0 1 33,72 V36 A6,6 0 0 1 39,30 Z"/>
+  <!-- right stem -->
+  <path fill="#7FE3D0" d="M69,30 A6,6 0 0 1 75,36 V72 A6,6 0 0 1 69,78 A6,6 0 0 1 63,72 V36 A6,6 0 0 1 69,30 Z"/>
+  <!-- link: the crossbar joining the two stems -->
+  <path fill="#7FE3D0" d="M39,48 H69 A6,6 0 0 1 69,60 H39 A6,6 0 0 1 39,48 Z"/>
+</svg>

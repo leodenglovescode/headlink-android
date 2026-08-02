@@ -130,6 +130,37 @@ correct, and trying it costs one TCP connect.
 At most one cached attempt and one refresh attempt happen per failed dial. Whatever happens, the
 **original** error is what surfaces, so a fallback failure never masks the real reason.
 
+## Timing
+
+The ordering above is correct but was, on its own, unusably slow. Three properties of the real
+control plane had to be accounted for, each found by tracing an actual connection from cellular.
+
+**The first attempt is bounded to 1.5s when the destination is a private address.** The
+coordination hostname resolves to a LAN address by design. Away from home that address is
+black-holed rather than refused, so the connect runs to the kernel's full SYN-retry timeout —
+76 seconds, measured — before the fallback gets a turn. A LAN answers in single-digit
+milliseconds, so the bound is never reached at home. It applies only to private destinations and
+only when a fallback exists; DERP, logtail and probe traffic keep the caller's own deadline. There
+is deliberately no unbounded retry when nothing works, since that would re-impose the stall on the
+case already failing, and the coordination client re-dials on its own schedule anyway.
+
+**A discovered address that works is reused for two minutes.** The coordination client opens a new
+connection per request and probes several ports in parallel. Re-deriving the fallback for each one
+compounded until the client's own deadline expired: the control key fetch would succeed and the
+registration immediately behind it would time out. The window is short on purpose — preferring the
+override is a latency optimisation, never a change of policy, so returning home is noticed promptly
+rather than masked by a cached decision. A remembered address that stops working is dropped at once
+and the normal path resumes.
+
+**Only the coordination server's own port is eligible.** The client also probes port 80 for the
+plaintext upgrade path. Nothing listens there, so every override offered for it was a dial that
+could not succeed while still consuming the shared deadline.
+
+Override sockets are bound to the underlying non-VPN network through the host application's
+existing hook. Binding to a concrete network also keeps the socket out of the tunnel, which is the
+property `VpnService.protect()` would provide but which is unavailable during login, before the VPN
+service exists.
+
 ## Settings
 
 Settings → Private Headscale IPv6 Discovery.
