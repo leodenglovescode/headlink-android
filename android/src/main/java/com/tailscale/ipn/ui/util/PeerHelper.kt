@@ -32,7 +32,11 @@ class PeerCategorizer {
 
     val me = netmap.currentUserProfile()
 
-    for (peer in (peers + selfNode)) {
+    // Deduplicate by StableID. Tailscale's coordination server never lists the current node among
+    // the peers, so upstream can append selfNode unconditionally. Headscale does include it, which
+    // produced two entries with the same StableID — and the peer list keys its items by StableID,
+    // so Compose threw "Key was already used" and the app crashed on every render once connected.
+    for (peer in (peers + selfNode).distinctBy { it.StableID }) {
 
       val userId = peer.User
       val profile = netmap.userProfile(userId)
