@@ -27,6 +27,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.MDMSettingsChangedReceiver
+import com.tailscale.ipn.privatediscovery.PrivateDiscovery
 import com.tailscale.ipn.ui.localapi.Client
 import com.tailscale.ipn.ui.localapi.Request
 import com.tailscale.ipn.ui.model.Ipn
@@ -210,6 +211,9 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     }
     TSLog.init(this)
     FeatureFlags.initialize(mapOf("enable_new_search" to true))
+    // Headlink: Private Headscale IPv6 Discovery. Must be initialized before the Go backend can
+    // call back into it, and is inert until the user enables it.
+    PrivateDiscovery.init(this)
   }
   /**
    * Called when a SAF directory URI is available (either already stored or chosen). We must restart
@@ -478,6 +482,17 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
       )
       false
     }
+  }
+
+  /**
+   * Headlink: Private Headscale IPv6 Discovery.
+   *
+   * Called from the Go dialer after a coordination-server TCP dial failed. Returns an alternate
+   * `[ipv6]:port` to try, or "" when the feature is off or the failed address is not the configured
+   * coordination server. See [PrivateDiscovery.dialFallback].
+   */
+  override fun privateDiscoveryDialFallback(failedAddr: String, allowLookup: Boolean): String {
+    return PrivateDiscovery.dialFallback(failedAddr, allowLookup)
   }
 
   override fun getUserCACertsPEM(): ByteArray {

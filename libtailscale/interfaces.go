@@ -86,6 +86,24 @@ type AppContext interface {
 	// GetUserCACertsPEM returns PEM-encoded user-installed CA certificates
 	// from the Android KeyStore, or empty bytes if none are installed.
 	GetUserCACertsPEM() ([]byte, error)
+
+	// PrivateDiscoveryDialFallback is a Headlink fork addition supporting the
+	// "Private Headscale IPv6 Discovery" feature. It is called after a
+	// coordination-server TCP dial to failedAddr (always an "ip:port" literal)
+	// has failed, and returns an alternate "ip:port" to try, or "" when the
+	// feature is disabled or failedAddr is not the configured coordination
+	// server. "" is not an error condition.
+	//
+	// When allowLookup is false the Java side must answer from its cache
+	// without touching the network. When true it may perform one fresh
+	// authenticated lookup, subject to its own rate limiting.
+	//
+	// Neither the result nor the error may ever contain the shared secret or
+	// any other credential.
+	//
+	// See libtailscale/privatediscovery and
+	// docs/private-headscale-ipv6-discovery.md.
+	PrivateDiscoveryDialFallback(failedAddr string, allowLookup bool) (string, error)
 }
 
 // IPNService corresponds to our IPNService in Java.

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tailscale/tailscale-android/libtailscale/privatediscovery"
 	"tailscale.com/drive/driveimpl"
 	_ "tailscale.com/feature/condregister"
 	"tailscale.com/feature/taildrop"
@@ -325,7 +326,38 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 	}
 	b.netMon = netMon
 	b.setupLogs(dataDir, logID, logf, sys.HealthTracker.Get(), a.isClientLoggingEnabled())
-	dialer := new(tsdial.Dialer)
+
+	// Headlink fork addition: Private Headscale IPv6 Discovery.
+	//
+	// tsdial.Dialer.SystemDial is the single funnel every coordination-server
+	// TCP connection passes through — both the pre-Noise "GET /key" fetch and
+	// the Noise/ts2021 dial — so wrapping it is the smallest possible hook for
+	// an application-local hosts-style override. TLS SNI/ServerName/certificate
+	// verification and the HTTP Host header are all decided one layer above
+	// this, in net/dnscache and control/ts2021, from the configured hostname;
+	// see libtailscale/privatediscovery for the full argument.
+	//
+	// UNSTABLE UPSTREAM SEAM. tsdial.NewFromFuncForDebug is exported and, unlike
+	// SetSystemDialerForTest, is not gated behind testenv.AssertInTest — but its
+	// name signals that upstream does not consider it API. If a rebase breaks
+	// this line, that is the one place to fix; the feature itself lives entirely
+	// in libtailscale/privatediscovery and the Kotlin layer.
+	//
+	// Note also that a Dialer built this way bypasses tsdial's own lazy netns
+	// dialer, so the base dial func below MUST be the netns dialer: that is what
+	// applies VpnService.protect()/bindSocketToNetwork() and keeps control-plane
+	// sockets out of the tunnel. The override dial reuses the same base for the
+	// same reason.
+	var dialer *tsdial.Dialer
+	if b.netMon != nil {
+		base := netns.NewDialer(logf, b.netMon)
+		dialer = tsdial.NewFromFuncForDebug(logf,
+			privatediscovery.New(appCtx, logf, base.DialContext).DialContext)
+	} else {
+		// netmon.New failed above; fall back to stock upstream behaviour rather
+		// than dialing without socket protection.
+		dialer = new(tsdial.Dialer)
+	}
 	vf := &VPNFacade{
 		SetBoth:           b.setCfg,
 		GetBaseConfigFunc: b.getDNSBaseConfig,
