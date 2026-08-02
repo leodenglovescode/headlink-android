@@ -69,6 +69,10 @@ object PrivateDiscovery {
    */
   private const val KEY_EXTRA_CA = "extra_ca_pem"
 
+  /** Last hostname whose addresses were successfully resolved, and those addresses. */
+  private const val KEY_CONTROL_HOST = "control_host"
+  private const val KEY_CONTROL_ADDRESSES = "control_addresses"
+
   /** How long a control-hostname DNS answer is reused, in milliseconds. */
   private const val RESOLVE_TTL_MILLIS = 60_000L
 
@@ -315,12 +319,19 @@ object PrivateDiscovery {
     if (!::appContext.isInitialized) return ""
 
     val config = config()
-    if (!config.enabled) return ""
+    if (!config.enabled) {
+      TSLog.d(TAG, "dial failed but private discovery is disabled")
+      return ""
+    }
 
     val port = portOf(failedAddr) ?: return ""
     val failedIp = ipOf(failedAddr) ?: return ""
 
-    if (!isConfiguredControlServer(failedIp)) return ""
+    if (!isConfiguredControlServer(failedIp, port)) {
+      // Expected for DERP, logtail and probe traffic; only interesting while diagnosing.
+      TSLog.d(TAG, "failed dial is not the configured coordination server; ignoring")
+      return ""
+    }
     if (!config.isUsable()) {
       TSLog.w(TAG, "coordination connection failed but private discovery is not fully configured")
       return ""
@@ -372,9 +383,12 @@ object PrivateDiscovery {
    * makes. It never applies to the default Tailscale coordination server, nor when the control URL
    * is already an IP literal.
    */
-  private fun isConfiguredControlServer(failedIp: InetAddress): Boolean {
+  private fun isConfiguredControlServer(failedIp: InetAddress, failedPort: Int): Boolean {
     val controlUrl = Notifier.prefs.value?.ControlURL?.trim().orEmpty()
-    if (controlUrl.isEmpty()) return false
+    if (controlUrl.isEmpty()) {
+      TSLog.d(TAG, "no control URL known yet")
+      return false
+    }
     if (controlUrl == Links.DEFAULT_CONTROL_URL) return false
 
     val host =
@@ -388,9 +402,60 @@ object PrivateDiscovery {
     if (looksLikeIpLiteral(host)) return false
     if (host.equals("controlplane.tailscale.com", ignoreCase = true)) return false
 
+    // The coordination client probes more than one port in parallel — notably port 80 for the
+    // plaintext upgrade path — and only the coordination server's own port can ever answer. Every
+    // override offered for another port is a dial that cannot succeed, and the client's deadline
+    // is shared, so those wasted attempts are what caused registration to time out behind a
+    // successful key fetch.
+    val controlPort = portOfUrl(controlUrl)
+    if (controlPort != null && failedPort != controlPort) {
+      TSLog.d(TAG, "failed dial is on port $failedPort, not the coordination port; ignoring")
+      return false
+    }
+
     val target = failedIp.address
-    return resolveControlHost(host).any { it.contentEquals(target) }
+    val resolved = resolveControlHost(host)
+    if (resolved.isNotEmpty()) {
+      val match = resolved.any { it.contentEquals(target) }
+      if (!match) {
+        // The coordination hostname's own addresses are not secret — the whole point is that they
+        // are the *published*, unroutable ones. The discovered address is never logged.
+        TSLog.d(TAG, "control host $host resolved to ${resolved.size} address(es), none matching")
+      }
+      return match
+    }
+
+    // Nothing to compare against. This is not an edge case: once the VPN interface is up with no
+    // working routes, name resolution inside this process fails outright, which is precisely the
+    // situation this feature exists for. The port has already been checked above, so accepting
+    // here still only ever applies to dials aimed at the coordination server's own port.
+    if (controlPort != null) {
+      TSLog.d(TAG, "cannot resolve $host; treating port $failedPort as the coordination server")
+      return true
+    }
+    TSLog.d(TAG, "cannot resolve $host and its port is unknown; ignoring")
+    return false
   }
+
+  /**
+   * The port a control URL connects to, explicit or implied by its scheme.
+   *
+   * A coordination server on a non-default port — as a self-hosted Headscale usually is — makes
+   * this a strong signal. On 443 it is weaker, but the cost of a false positive is one extra TCP
+   * attempt to an address we already hold, never a credential or a changed TLS identity.
+   */
+  private fun portOfUrl(url: String): Int? =
+      try {
+        val uri = URI(url)
+        when {
+          uri.port > 0 -> uri.port
+          uri.scheme.equals("https", ignoreCase = true) -> 443
+          uri.scheme.equals("http", ignoreCase = true) -> 80
+          else -> null
+        }
+      } catch (e: Exception) {
+        null
+      }
 
   /** Resolves the control hostname on the underlying (non-VPN) network, memoized briefly. */
   private fun resolveControlHost(host: String): List<ByteArray> {
@@ -400,17 +465,76 @@ object PrivateDiscovery {
         return it.addresses
       }
     }
-    val addresses =
-        try {
-          val network: Network? = NetworkChangeCallback.cachedDefaultNetwork
-          val answers = network?.getAllByName(host) ?: InetAddress.getAllByName(host)
-          answers.map { it.address }
-        } catch (e: Exception) {
-          // Resolution failure just means "we cannot confirm this is the control server".
-          emptyList()
-        }
-    resolved = ResolvedHost(host, addresses, now)
-    return addresses
+
+    val addresses = lookupHost(host)
+    if (addresses.isNotEmpty()) {
+      rememberControlAddresses(host, addresses)
+      resolved = ResolvedHost(host, addresses, now)
+      return addresses
+    }
+
+    // Resolution failed. That happens exactly when it is least affordable: away from home, with
+    // the tunnel half-established, the very moment this feature is supposed to engage. Fall back
+    // to addresses this same hostname has previously resolved to. Scope never widens — only
+    // addresses actually observed for this exact hostname are ever accepted.
+    val remembered = rememberedControlAddresses(host)
+    if (remembered.isNotEmpty()) {
+      TSLog.d(TAG, "resolution of $host failed; using previously observed addresses")
+    }
+    resolved = ResolvedHost(host, remembered, now)
+    return remembered
+  }
+
+  /**
+   * Resolves [host], preferring the underlying non-VPN network but falling back to the ordinary
+   * resolver.
+   *
+   * The network-bound lookup throws rather than returning empty when the bound network cannot
+   * answer, so the fallback has to be in a catch block — an elvis operator only covers the case
+   * where there is no bound network at all.
+   */
+  private fun lookupHost(host: String): List<ByteArray> {
+    val network: Network? = NetworkChangeCallback.cachedDefaultNetwork
+    if (network != null) {
+      try {
+        return network.getAllByName(host).map { it.address }
+      } catch (e: Exception) {
+        TSLog.d(TAG, "network-bound resolution of $host failed: ${e.javaClass.simpleName}")
+      }
+    }
+    return try {
+      InetAddress.getAllByName(host).map { it.address }
+    } catch (e: Exception) {
+      TSLog.d(TAG, "resolution of $host failed: ${e.javaClass.simpleName}")
+      emptyList()
+    }
+  }
+
+  private fun rememberControlAddresses(host: String, addresses: List<ByteArray>) {
+    prefs()
+        .edit()
+        .putString(KEY_CONTROL_HOST, host)
+        .putString(KEY_CONTROL_ADDRESSES, addresses.joinToString(",") { it.toHex() })
+        .apply()
+  }
+
+  /** Previously observed addresses, but only for the hostname they were observed for. */
+  private fun rememberedControlAddresses(host: String): List<ByteArray> {
+    val p = prefs()
+    if (p.getString(KEY_CONTROL_HOST, null) != host) return emptyList()
+    val stored = p.getString(KEY_CONTROL_ADDRESSES, null) ?: return emptyList()
+    return stored.split(",").mapNotNull { it.fromHexOrNull() }
+  }
+
+  private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+  private fun String.fromHexOrNull(): ByteArray? {
+    if (length % 2 != 0 || isEmpty()) return null
+    return try {
+      ByteArray(length / 2) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+    } catch (e: NumberFormatException) {
+      null
+    }
   }
 
   // ------------------------------------------------------------------ helpers
@@ -516,8 +640,11 @@ class AndroidLookupTransport(
               "TLS error contacting the lookup endpoint; it may require a client certificate"
           else "TLS error contacting the lookup endpoint")
     } catch (e: UnknownHostException) {
+      // The bound network is stated explicitly: resolution failing here, while the same name
+      // resolves fine outside the app, points at the socket not reaching the underlying network.
       throw PrivateDiscoveryLookup.TransportException(
-          PrivateDiscoveryLookup.FailureKind.NETWORK_ERROR, "Could not resolve the lookup endpoint")
+          PrivateDiscoveryLookup.FailureKind.NETWORK_ERROR,
+          "Could not resolve the lookup endpoint (bound network: ${networkProvider() != null})")
     } catch (e: IOException) {
       throw PrivateDiscoveryLookup.TransportException(
           PrivateDiscoveryLookup.FailureKind.NETWORK_ERROR, "Could not reach the lookup endpoint")

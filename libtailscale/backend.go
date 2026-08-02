@@ -351,8 +351,21 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 	var dialer *tsdial.Dialer
 	if b.netMon != nil {
 		base := netns.NewDialer(logf, b.netMon)
+		// Bind override sockets to the underlying non-VPN network. On a device
+		// with more than one active cellular subscription an unbound socket may
+		// take its source address from the wrong PDN — one that cannot reach
+		// the destination at all — which is indistinguishable from the host
+		// being down. Binding also keeps the socket out of the tunnel.
+		bind := func(fd int) error {
+			if ok := appCtx.BindSocketToNetwork(int32(fd)); !ok {
+				// Match upstream's posture for the equivalent hook: log and
+				// continue rather than failing the dial outright.
+				logf("private discovery: bindSocketToNetwork(%d) returned false", fd)
+			}
+			return nil
+		}
 		dialer = tsdial.NewFromFuncForDebug(logf,
-			privatediscovery.New(appCtx, logf, base.DialContext).DialContext)
+			privatediscovery.New(appCtx, logf, base.DialContext, bind).DialContext)
 	} else {
 		// netmon.New failed above; fall back to stock upstream behaviour rather
 		// than dialing without socket protection.

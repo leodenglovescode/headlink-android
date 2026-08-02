@@ -114,7 +114,7 @@ func (r *recordingBase) dialsSnapshot() []string {
 func TestNormalDialSucceedsFallbackUntouched(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443", refreshed: "[2001:db8::2]:443"}
 	base := newRecordingBase("192.168.3.61:443")
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err != nil {
@@ -135,7 +135,7 @@ func TestNormalDialSucceedsFallbackUntouched(t *testing.T) {
 func TestCachedAddressUsedOnFailure(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443"}
 	base := newRecordingBase("[2001:db8::1]:443")
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err != nil {
@@ -160,7 +160,7 @@ func TestCachedAddressUsedOnFailure(t *testing.T) {
 func TestRefreshAfterCachedAddressFails(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443", refreshed: "[2001:db8::2]:443"}
 	base := newRecordingBase("[2001:db8::2]:443")
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err != nil {
@@ -187,7 +187,7 @@ func TestRefreshAfterCachedAddressFails(t *testing.T) {
 func TestNoInfiniteRetryAndOriginalErrorPreserved(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443", refreshed: "[2001:db8::2]:443"}
 	base := newRecordingBase() // nothing succeeds
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	_, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err == nil {
@@ -212,7 +212,7 @@ func TestUnrelatedTrafficUnaffected(t *testing.T) {
 	// configured control server".
 	fb := &fakeFallback{}
 	base := newRecordingBase()
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	for _, addr := range []string{
 		"192.0.2.10:443",  // DERP-ish
@@ -234,7 +234,7 @@ func TestUnrelatedTrafficUnaffected(t *testing.T) {
 func TestNonTCPNeverConsultsFallback(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443", refreshed: "[2001:db8::1]:443"}
 	base := newRecordingBase()
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	for _, network := range []string{"udp", "udp4", "udp6", "unix"} {
 		if _, err := d.DialContext(context.Background(), network, "192.168.3.61:443"); err == nil {
@@ -251,7 +251,7 @@ func TestNonTCPNeverConsultsFallback(t *testing.T) {
 func TestHostnameAddressNeverConsultsFallback(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443"}
 	base := newRecordingBase()
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	if _, err := d.DialContext(context.Background(), "tcp", "derp1.example.com:443"); err == nil {
 		t.Fatal("dial unexpectedly succeeded")
@@ -266,7 +266,7 @@ func TestHostnameAddressNeverConsultsFallback(t *testing.T) {
 func TestFallbackErrorFailsClosed(t *testing.T) {
 	fb := &fakeFallback{err: errors.New("lookup failed: HTTP 401")}
 	base := newRecordingBase()
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	_, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err == nil {
@@ -280,7 +280,7 @@ func TestFallbackErrorFailsClosed(t *testing.T) {
 // A nil Fallback (feature never wired up) is a transparent pass-through.
 func TestNilFallbackIsPassThrough(t *testing.T) {
 	base := newRecordingBase("192.168.3.61:443")
-	d := New(nil, t.Logf, base.dial)
+	d := New(nil, t.Logf, base.dial, nil)
 
 	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
 	if err != nil {
@@ -358,7 +358,7 @@ func TestTLSIdentityFollowsHostnameNotDialedIP(t *testing.T) {
 	fb := &fakeFallback{cached: realAddr}
 	base := newRecordingBase(realAddr) // 127.0.0.2 is NOT dialable
 	base.real = true                   // this test needs a genuine TCP socket
-	d := New(fb, t.Logf, base.dial)
+	d := New(fb, t.Logf, base.dial, nil)
 
 	// Exactly the wiring control/controlhttp uses: a dnscache.Resolver pinned
 	// to a single host, wrapped by dnscache.TLSDialer.
@@ -496,4 +496,144 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// The coordination client opens a connection per request and probes several
+// ports at once. Once an override has worked, later dials must reuse it rather
+// than paying the full failure cycle again — that repeated cost is what pushed
+// the client past its own deadline, so a working key fetch was followed by a
+// registration that timed out.
+func TestWorkingOverrideIsReusedForLaterDials(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			c.Close()
+		}
+	}()
+
+	// The normal address always fails; the discovered one is a real listener.
+	base := newRecordingBase(ln.Addr().String())
+	base.real = true
+	fb := &fakeFallback{cached: ln.Addr().String(), refreshed: ln.Addr().String()}
+	d := New(fb, t.Logf, base.dial, nil)
+
+	for i := 0; i < 3; i++ {
+		c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		c.Close()
+	}
+
+	// Only the first dial should have consulted the fallback or retried the
+	// normal path; the two after it go straight to the remembered address.
+	if got := fb.callCount(); got != 1 {
+		t.Errorf("fallback consulted %d times, want 1", got)
+	}
+	normalAttempts := 0
+	for _, a := range base.dialsSnapshot() {
+		if a == "192.168.3.61:5007" {
+			normalAttempts++
+		}
+	}
+	if normalAttempts != 1 {
+		t.Errorf("normal path attempted %d times, want 1", normalAttempts)
+	}
+}
+
+// A remembered override that stops working must not strand the caller: the
+// normal path has to be retried and the original error surfaced.
+func TestStickyOverrideIsAbandonedWhenItStopsWorking(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			c.Close()
+		}
+	}()
+
+	base := newRecordingBase(ln.Addr().String())
+	base.real = true
+	fb := &fakeFallback{cached: ln.Addr().String(), refreshed: ln.Addr().String()}
+	d := New(fb, t.Logf, base.dial, nil)
+
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+	if err != nil {
+		t.Fatalf("first dial: %v", err)
+	}
+	c.Close()
+
+	// The discovered address goes away, and nothing new is on offer.
+	ln.Close()
+	base.mu.Lock()
+	base.ok = map[string]bool{}
+	base.mu.Unlock()
+	fb.mu.Lock()
+	fb.cached, fb.refreshed = "", ""
+	fb.mu.Unlock()
+
+	if _, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007"); err == nil {
+		t.Fatal("expected failure once neither path works")
+	} else if !strings.Contains(err.Error(), "connection refused") {
+		t.Errorf("want the original error surfaced, got %v", err)
+	}
+}
+
+// A private address that is black-holed rather than refused must not hold the
+// coordination connection hostage for the kernel's full SYN-retry timeout —
+// measured at 76s on cellular, which is the whole "stuck on Starting..."
+// symptom. Public destinations must keep their normal timing.
+func TestBlackHoledPrivateAddressDoesNotStallTheDial(t *testing.T) {
+	blackhole := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr == "[2001:db8::1]:5007" {
+			c, _ := net.Pipe()
+			return c, nil
+		}
+		<-ctx.Done() // never answers, like a dropped SYN
+		return nil, ctx.Err()
+	}
+	fb := &fakeFallback{cached: "[2001:db8::1]:5007"}
+	d := New(fb, t.Logf, blackhole, nil)
+
+	start := time.Now()
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	c.Close()
+	if elapsed := time.Since(start); elapsed > privateDialTimeout+2*time.Second {
+		t.Errorf("took %v; the first attempt should be bounded to %v", elapsed, privateDialTimeout)
+	}
+}
+
+// The bound applies only to private destinations. DERP and similar public
+// traffic must keep the caller's own deadline.
+func TestPublicDestinationsAreNotBounded(t *testing.T) {
+	fb := &fakeFallback{}
+	d := New(fb, t.Logf, newRecordingBase().dial, nil)
+	if d.shouldBoundFirstAttempt("tcp", "192.168.3.61:5007") != true {
+		t.Error("a private address should be bounded")
+	}
+	for _, addr := range []string{"1.2.3.4:443", "[2606:4700::1]:443", "[2409:8a00::1]:5007"} {
+		if d.shouldBoundFirstAttempt("tcp", addr) {
+			t.Errorf("%s is public and must not be bounded", addr)
+		}
+	}
+	if d.shouldBoundFirstAttempt("udp", "192.168.3.61:5007") {
+		t.Error("non-TCP must not be bounded")
+	}
 }
