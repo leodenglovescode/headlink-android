@@ -37,6 +37,13 @@ android {
     ndkVersion "23.1.7779620"
     compileSdkVersion androidApiLevel
     defaultConfig {
+        // Headlink is an independent fork of the open source Tailscale Android
+        // client. It uses its own applicationId so it installs alongside the
+        // official Tailscale app rather than replacing it. The `namespace`
+        // below intentionally stays com.tailscale.ipn: renaming the whole
+        // package tree would make every future upstream rebase painful for no
+        // functional gain.
+        applicationId 'dev.leodeng.headlink'
         minSdkVersion 26
         targetSdkVersion androidApiLevel
         // versionCode is stamped here by `make bump-version-code` (run via

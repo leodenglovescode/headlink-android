@@ -36,7 +36,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Tailscale"
+        android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:enableOnBackInvokedCallback="true"
@@ -96,9 +96,9 @@
             android:name="IPNReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.tailscale.ipn.CONNECT_VPN" />
-                <action android:name="com.tailscale.ipn.DISCONNECT_VPN" />
-                <action android:name="com.tailscale.ipn.USE_EXIT_NODE" />
+                <action android:name="dev.leodeng.headlink.CONNECT_VPN" />
+                <action android:name="dev.leodeng.headlink.DISCONNECT_VPN" />
+                <action android:name="dev.leodeng.headlink.USE_EXIT_NODE" />
             </intent-filter>
         </receiver>
 

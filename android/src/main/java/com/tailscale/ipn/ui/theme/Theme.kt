@@ -58,10 +58,10 @@ fun AppTheme(useDarkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 private val LightColors =
     lightColorScheme(
-        primary = Color(0xFF4B70CC), // blue-500
+        primary = Color(0xFF0F7A6B), // Headlink teal-500
         onPrimary = Color(0xFFFFFFFF), // white
-        primaryContainer = Color(0xFFF0F5FF), // blue-0
-        onPrimaryContainer = Color(0xFF3E5DB3), // blue-600
+        primaryContainer = Color(0xFFE6F5F2), // Headlink teal-0
+        onPrimaryContainer = Color(0xFF0C6153), // Headlink teal-600
         error = Color(0xFFB22C30), // red-500
         onError = Color(0xFFFFFFFF), // white
         errorContainer = Color(0xFFFEF6F3), // red-0
@@ -87,10 +87,10 @@ private val LightColors =
 
 private val DarkColors =
     darkColorScheme(
-        primary = Color(0xFF3E5DB3), // blue-600
+        primary = Color(0xFF0B5C51), // Headlink teal-600
         onPrimary = Color(0xFFFFFFFF), // white
-        primaryContainer = Color(0xFFf0f5ff), // blue-0
-        onPrimaryContainer = Color(0xFF5A82DC), // blue-400
+        primaryContainer = Color(0xFFe6f5f2), // Headlink teal-0
+        onPrimaryContainer = Color(0xFF35A392), // Headlink teal-400
         error = Color(0xFFEF5350), // red-400
         onError = Color(0xFFFFFFFF), // white
         errorContainer = Color(0xFFfff6f4), // red-0
@@ -316,13 +316,13 @@ val ColorScheme.secondaryButton: ButtonColors
     val defaults = ButtonDefaults.buttonColors()
     if (isSystemInDarkTheme()) {
       return ButtonColors(
-          containerColor = Color(0xFF4B70CC), // blue-500
+          containerColor = Color(0xFF0F7A6B), // Headlink teal-500
           contentColor = Color(0xFFFFFFFF), // white
           disabledContainerColor = defaults.disabledContainerColor,
           disabledContentColor = defaults.disabledContentColor)
     } else {
       return ButtonColors(
-          containerColor = Color(0xFF5A82DC), // blue-400
+          containerColor = Color(0xFF35A392), // Headlink teal-400
           contentColor = Color(0xFFFFFFFF), // white
           disabledContainerColor = defaults.disabledContainerColor,
           disabledContentColor = defaults.disabledContentColor)

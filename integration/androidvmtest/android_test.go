@@ -47,10 +47,10 @@ var (
 )
 
 const (
-	androidPackage    = "com.tailscale.ipn"
+	androidPackage    = "dev.leodeng.headlink"
 	probePackage      = "com.tailscale.ipn.integrationprobe"
 	probeReceiver     = probePackage + "/.NetprobeReceiver"
-	loginAction       = "com.tailscale.ipn.integration.LOGIN"
+	loginAction       = "dev.leodeng.headlink.integration.LOGIN"
 	authKey           = "tskey-integration-android"
 	debugKeystorePass = "android"
 )

@@ -1,3 +1,32 @@
+# Headlink
+
+**Headlink is an independent fork and is not an official Tailscale application.**
+
+Headlink is a personal Android client for private [Headscale](https://headscale.net) deployments,
+based on the open source [Tailscale Android client](https://github.com/tailscale/tailscale-android).
+The networking engine is genuinely Tailscale; only the product identity differs.
+
+* Application ID: `dev.leodeng.headlink` — installs side by side with official Tailscale
+* Upstream: https://github.com/tailscale/tailscale-android
+
+## What this fork adds
+
+**Private Headscale IPv6 Discovery.** If your Headscale hostname deliberately resolves to a private
+LAN address so your home network's rotating public IPv6 is never published, Headlink can fetch that
+address from a small authenticated HTTPS endpoint and connect directly to it — while the
+Headscale hostname still drives TLS SNI, certificate verification and the HTTP Host header. It is
+the equivalent of one `/etc/hosts` line, scoped to the coordination-server connection only.
+
+It never proxies or relays Tailscale traffic, never weakens TLS, and never touches the WireGuard
+data plane. See [docs/private-headscale-ipv6-discovery.md](docs/private-headscale-ipv6-discovery.md)
+for the architecture, security model, and limitations, and [AGENTS.md](AGENTS.md) for the fork's
+maintenance rules.
+
+Everything below is upstream documentation, kept as-is. It refers to the official Tailscale app;
+Headlink is not distributed through any of the channels it mentions, and is built from source.
+
+---
+
 # Tailscale Android Client
 
 https://tailscale.com

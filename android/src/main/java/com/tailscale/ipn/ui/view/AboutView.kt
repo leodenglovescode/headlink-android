@@ -67,6 +67,20 @@ fun AboutView(backToSettings: BackNavigation) {
                     stringResource(R.string.about_view_title),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = MaterialTheme.typography.titleLarge.fontSize)
+                // Headlink fork identity. The networking engine genuinely is Tailscale, so the
+                // attribution below stays; only the product identity differs.
+                Text(
+                    stringResource(R.string.about_view_subtitle),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                Text(
+                    stringResource(R.string.about_view_fork_disclaimer),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp))
                 Text(
                     modifier =
                         Modifier.clickable {

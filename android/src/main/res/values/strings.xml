@@ -30,15 +30,17 @@
     <string name="cancel">Cancel</string>
 
     <!-- Strings for the about screen -->
-    <string name="app_name" translatable="false">Tailscale</string>
-    <string name="tile_name" translatable="false">Tailscale</string>
+    <string name="app_name" translatable="false">Headlink</string>
+    <string name="tile_name" translatable="false">Headlink</string>
     <string name="version">Version</string>
-    <string name="about_view_header">About Tailscale</string>
-    <string name="about_view_title">Tailscale for Android</string>
+    <string name="about_view_header">About Headlink</string>
+    <string name="about_view_title">Headlink for Android</string>
+    <string name="about_view_subtitle">Private Headscale client based on the open-source Tailscale Android client.</string>
+    <string name="about_view_fork_disclaimer">Headlink is an independent fork and is not an official Tailscale application.</string>
     <string name="acknowledgements">Acknowledgements</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="terms_of_service">Terms of Service</string>
-    <string name="about_view_footnotes">WireGuard is a registered trademark of Jason A. Donenfeld.\n\n© 2024 Tailscale Inc. All rights reserved.\nTailscale is a registered trademark of Tailscale Inc.</string>
+    <string name="about_view_footnotes">WireGuard is a registered trademark of Jason A. Donenfeld.\n\n© 2024 Tailscale Inc. All rights reserved.\nTailscale is a registered trademark of Tailscale Inc.\n\nHeadlink is derived from the open-source Tailscale Android client, used under the BSD-3-Clause license.</string>
     <string name="managed_by">Managed by</string>
 
     <!-- Strings for the bug reporting screen -->
@@ -66,9 +68,9 @@
     <string name="starting">Starting…</string>
     <string name="connect_to_tailnet_prefix">"Connect again to talk to the other devices in the "</string>
     <string name="connect_to_tailnet_suffix">" tailnet."</string>
-    <string name="welcome_to_tailscale">Welcome to Tailscale</string>
-    <string name="login_to_join_your_tailnet">Log in to join your tailnet and connect your devices.</string>
-    <string name="give_permissions">Set up a VPN connection so you can start using Tailscale.</string>
+    <string name="welcome_to_tailscale">Welcome to Headlink</string>
+    <string name="login_to_join_your_tailnet">Connect to your Headscale server to link your devices.</string>
+    <string name="give_permissions">Set up a VPN connection so you can start using Headlink.</string>
     <string name="keyExpiryExplainer">Reauthenticate to remain connected to Tailscale.</string>
     <string name="deviceKeyNeverExpires">Device key does not expire</string>
     <string name="deviceKeyExpires">Device key expires %s</string>
@@ -125,6 +127,17 @@
     <string name="add_profile_failed">Unable to add a new profile. Please try again.</string>
     <string name="invalidCustomUrl">Please enter a valid URL in the form https://server.com</string>
     <string name="invalidCustomURLTitle">Invalid URL</string>
+    <string name="headscale_login_title">Headscale server</string>
+    <string name="headscale_login_description">Headlink connects to your own Headscale coordination server. Enter its address below. The address is also the TLS identity, so it must match the server\'s certificate.</string>
+    <string name="headscale_server_url">Server address</string>
+    <string name="headscale_server_url_placeholder" translatable="false">https://headscale.example.com</string>
+    <string name="headscale_server_url_help">Use a hostname, not an IP address, if you rely on Private Headscale IPv6 Discovery — that feature needs a stable name to keep the certificate valid while the address changes.</string>
+    <string name="headscale_auth_key">Auth key (optional)</string>
+    <string name="headscale_auth_key_placeholder">Paste a pre-auth key</string>
+    <string name="headscale_auth_key_help">Leave empty to register in your browser instead. Generate one with: headscale preauthkeys create --user &lt;id&gt;</string>
+    <string name="headscale_connect">Connect</string>
+    <string name="headlink_attribution">Adapted from the open-source Tailscale Android client, used under the BSD-3-Clause license. Not affiliated with Tailscale Inc.</string>
+    <string name="headscale_change_server">Headscale server</string>
     <string name="custom_control_menu">Use an alternate server</string>
     <string name="custom_control_menu_desc">Enter the URL of an alternate Tailscale server or your self-hosted Headscale server.</string>
     <string name="custom_control_placeholder" translatable="false">https://my.custom.server.com</string>
@@ -379,5 +392,72 @@
     <!-- Strings for Hardware Attestation MDM setting -->
     <string name="enable_hardware_attestation">Enable hardware attestation</string>
     <string name="use_hardware_backed_keys_to_bind_node_identity_to_the_device">Use hardware-backed keys to bind node identity to the device</string>
+
+    <!-- Strings for Private Headscale IPv6 Discovery (Headlink) -->
+    <string name="private_discovery_title">Private Headscale IPv6 Discovery</string>
+    <string name="private_discovery_settings_subtitle_on">On</string>
+    <string name="private_discovery_settings_subtitle_off">Off</string>
+    <string name="private_discovery_description">If your Headscale server can\'t be reached at its normal address, Headlink can fetch your home network\'s current public IPv6 from a private, authenticated endpoint and connect directly to it. The endpoint may return the address as plain text or as JSON. The Headscale hostname is still used for TLS and the HTTP Host header, so certificate verification is unchanged.</string>
+    <string name="private_discovery_enable">Enable private IPv6 discovery</string>
+    <string name="private_discovery_enable_subtitle">Only used after a normal connection to your coordination server fails.</string>
+
+    <string name="private_discovery_endpoint_header">Lookup endpoint</string>
+    <string name="private_discovery_lookup_url">Lookup URL</string>
+    <string name="private_discovery_lookup_url_placeholder">https://example.com/api/current-ip</string>
+    <string name="private_discovery_auth_header">Auth header name</string>
+    <string name="private_discovery_auth_header_placeholder">X-Sync-Secret</string>
+    <string name="private_discovery_auth_header_supporting">The request header the secret is sent in. For standard bearer auth, use Authorization and set the secret to “Bearer …”.</string>
+    <string name="private_discovery_secret">Shared secret</string>
+    <string name="private_discovery_secret_placeholder">Sent as the value of the header above</string>
+    <string name="private_discovery_show_secret">Show</string>
+    <string name="private_discovery_hide_secret">Hide</string>
+    <string name="private_discovery_secret_stored">Encrypted with a key held by the Android Keystore.</string>
+
+    <string name="private_discovery_mtls_header">Client certificate (mutual TLS)</string>
+    <string name="private_discovery_mtls_description">Only needed if your lookup endpoint requires a client certificate. Leave empty otherwise. A CA certificate added here is trusted in addition to the system ones, never instead of them.</string>
+    <string name="private_discovery_client_cert">Client certificate</string>
+    <string name="private_discovery_client_cert_summary">%1$s\nExpires %2$s</string>
+    <string name="private_discovery_client_cert_passphrase">Bundle passphrase</string>
+    <string name="private_discovery_client_cert_passphrase_hint">Passphrase for the .p12 file</string>
+    <string name="private_discovery_import_client_cert">Import .p12</string>
+    <string name="private_discovery_extra_ca">Extra CA certificate</string>
+    <string name="private_discovery_import_ca">Import CA</string>
+    <string name="private_discovery_remove">Remove</string>
+
+    <string name="private_discovery_timing_header">Timing</string>
+    <string name="private_discovery_cache_max_age">Cache max age</string>
+    <string name="private_discovery_cache_max_age_subtitle">A connection failure always forces a refresh, whatever this is set to.</string>
+    <string name="private_discovery_request_timeout">Request timeout (seconds)</string>
+    <string name="private_discovery_unit_minutes">Minutes</string>
+    <string name="private_discovery_unit_hours">Hours</string>
+    <string name="private_discovery_unit_days">Days</string>
+    <string name="private_discovery_unit_only_on_failure">Only on failure</string>
+
+    <string name="private_discovery_status_header">Status</string>
+    <string name="private_discovery_cached_address">Cached public IPv6</string>
+    <string name="private_discovery_last_lookup">Last successful lookup</string>
+    <string name="private_discovery_cache_status">Cache status</string>
+    <string name="private_discovery_last_result">Last lookup result</string>
+    <string name="private_discovery_cache_valid">Valid</string>
+    <string name="private_discovery_cache_expired">Expired</string>
+    <string name="private_discovery_cache_empty">Empty</string>
+    <string name="private_discovery_none">None yet</string>
+
+    <string name="private_discovery_test_lookup">Test Lookup</string>
+    <string name="private_discovery_refresh_now">Refresh Now</string>
+    <string name="private_discovery_clear_cache">Clear Cached Address</string>
+    <string name="private_discovery_clear_cache_confirm_title">Clear cached address?</string>
+    <string name="private_discovery_clear_cache_confirm_message">This removes only the cached IPv6 address and its timestamp. Your lookup URL, shared secret and timing settings are kept.</string>
+    <string name="private_discovery_lookup_success">Lookup successful</string>
+    <string name="private_discovery_lookup_failed">Lookup failed</string>
+    <string name="private_discovery_working">Working…</string>
+
+    <string name="private_discovery_error_url_empty">Enter a lookup URL.</string>
+    <string name="private_discovery_error_url_invalid">That is not a valid URL.</string>
+    <string name="private_discovery_error_url_not_https">The lookup URL must use https://</string>
+    <string name="private_discovery_error_url_no_host">The lookup URL has no hostname.</string>
+    <string name="private_discovery_error_auth_header_invalid">Use only letters, digits and -_. characters.</string>
+    <string name="private_discovery_error_timeout_range">Enter a whole number of seconds between 2 and 60.</string>
+    <string name="private_discovery_error_cache_age_range">Enter a whole number. The minimum is 5 minutes.</string>
 
 </resources>

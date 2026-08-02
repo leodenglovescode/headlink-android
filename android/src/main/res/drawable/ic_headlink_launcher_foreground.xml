@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (c) Tailscale Inc & AUTHORS
+  SPDX-License-Identifier: BSD-3-Clause
+
+  Headlink launcher mark: an "H" monogram with fully rounded terminals, drawn
+  inside the 72x72 adaptive-icon safe zone of the 108x108 canvas.
+
+  This is a new file rather than an edit of the upstream
+  ic_launcher_foreground.xml, so pulling upstream icon changes stays conflict
+  free.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- left stem -->
+    <path
+        android:fillColor="#7FE3D0"
+        android:pathData="M39,30 A6,6 0 0 1 45,36 V72 A6,6 0 0 1 39,78 A6,6 0 0 1 33,72 V36 A6,6 0 0 1 39,30 Z" />
+
+    <!-- right stem -->
+    <path
+        android:fillColor="#7FE3D0"
+        android:pathData="M69,30 A6,6 0 0 1 75,36 V72 A6,6 0 0 1 69,78 A6,6 0 0 1 63,72 V36 A6,6 0 0 1 69,30 Z" />
+
+    <!-- link: the crossbar joining the two stems -->
+    <path
+        android:fillColor="#7FE3D0"
+        android:pathData="M39,48 H69 A6,6 0 0 1 69,60 H39 A6,6 0 0 1 39,48 Z" />
+</vector>

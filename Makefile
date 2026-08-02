@@ -36,7 +36,7 @@ endif
 
 ANDROID_BUILD_TOOLS_VERSION := $(shell grep '^androidBuildToolsVersion=' android/gradle.properties | cut -d'=' -f2)
 
-DEBUG_APK := tailscale-debug.apk
+DEBUG_APK := headlink-debug.apk
 RELEASE_AAB := tailscale-release.aab
 RELEASE_TV_AAB := tailscale-tv-release.aab
 
@@ -405,7 +405,7 @@ install: $(DEBUG_APK) ## Install the debug APK on a connected device
 
 .PHONY: run
 run: install ## Run the debug APK on a connected device
-	adb shell am start -n com.tailscale.ipn/com.tailscale.ipn.MainActivity
+	adb shell am start -n dev.leodeng.headlink/com.tailscale.ipn.MainActivity
 
 .PHONY: docker-build-image
 docker-build-image: ## Builds the docker image for the android build environment if it does not exist

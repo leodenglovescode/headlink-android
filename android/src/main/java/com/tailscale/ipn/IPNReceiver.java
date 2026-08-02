@@ -20,10 +20,14 @@ import java.util.Objects;
  */
 public class IPNReceiver extends BroadcastReceiver {
 
-    public static final String INTENT_CONNECT_VPN = "com.tailscale.ipn.CONNECT_VPN";
-    public static final String INTENT_DISCONNECT_VPN = "com.tailscale.ipn.DISCONNECT_VPN";
-    public static final String INTENT_INTEGRATION_LOGIN = "com.tailscale.ipn.integration.LOGIN";
-    private static final String INTENT_USE_EXIT_NODE = "com.tailscale.ipn.USE_EXIT_NODE";
+    // Headlink uses its own action namespace so that, when installed side by side with the
+    // official Tailscale app, a broadcast intended for one client is never also delivered to
+    // the other.
+
+    public static final String INTENT_CONNECT_VPN = "dev.leodeng.headlink.CONNECT_VPN";
+    public static final String INTENT_DISCONNECT_VPN = "dev.leodeng.headlink.DISCONNECT_VPN";
+    public static final String INTENT_INTEGRATION_LOGIN = "dev.leodeng.headlink.integration.LOGIN";
+    private static final String INTENT_USE_EXIT_NODE = "dev.leodeng.headlink.USE_EXIT_NODE";
 
     // Unique work names prevent connect/disconnect flapping from enqueuing a long backlog.
     private static final String WORK_CONNECT = "ipn-connect-vpn";
