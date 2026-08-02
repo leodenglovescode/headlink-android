@@ -114,7 +114,7 @@ behaviour is identical to upstream: no lookup requests, no alternate dialing.
 With it **enabled**:
 
 **Phase 1 — normal connection.** The ordinary dial runs first, unchanged. At home
-`headscale.example → 192.168.3.61` connects and the lookup endpoint is never contacted.
+`headscale.example → 192.168.1.10` connects and the lookup endpoint is never contacted.
 
 **Phase 2 — cached address.** If phase 1 fails, and the failed IP is one of the control hostname's
 own resolved addresses, and a cached IPv6 exists that is within the configured max age, dial

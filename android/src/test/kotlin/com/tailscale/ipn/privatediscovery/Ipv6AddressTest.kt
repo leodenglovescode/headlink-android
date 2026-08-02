@@ -55,7 +55,7 @@ class Ipv6AddressTest {
   @Test
   fun rejectsIpv4() {
     assertEquals(Ipv6Address.Rejection.NOT_IPV6, rejected("203.0.113.7"))
-    assertEquals(Ipv6Address.Rejection.NOT_IPV6, rejected("192.168.3.61\n"))
+    assertEquals(Ipv6Address.Rejection.NOT_IPV6, rejected("192.168.1.10\n"))
   }
 
   @Test

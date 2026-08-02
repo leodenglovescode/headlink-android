@@ -113,10 +113,10 @@ func (r *recordingBase) dialsSnapshot() []string {
 // unchanged and the lookup service is never consulted.
 func TestNormalDialSucceedsFallbackUntouched(t *testing.T) {
 	fb := &fakeFallback{cached: "[2001:db8::1]:443", refreshed: "[2001:db8::2]:443"}
-	base := newRecordingBase("192.168.3.61:443")
+	base := newRecordingBase("192.168.1.10:443")
 	d := New(fb, t.Logf, base.dial, nil)
 
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err != nil {
 		t.Fatalf("DialContext: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestNormalDialSucceedsFallbackUntouched(t *testing.T) {
 	if got := fb.callCount(); got != 0 {
 		t.Errorf("fallback consulted %d times on a successful dial; want 0", got)
 	}
-	if got := base.dialsSnapshot(); len(got) != 1 || got[0] != "192.168.3.61:443" {
+	if got := base.dialsSnapshot(); len(got) != 1 || got[0] != "192.168.1.10:443" {
 		t.Errorf("base dials = %v; want exactly one dial of the original address", got)
 	}
 }
@@ -137,7 +137,7 @@ func TestCachedAddressUsedOnFailure(t *testing.T) {
 	base := newRecordingBase("[2001:db8::1]:443")
 	d := New(fb, t.Logf, base.dial, nil)
 
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err != nil {
 		t.Fatalf("DialContext: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCachedAddressUsedOnFailure(t *testing.T) {
 	if calls[0].allowLookup {
 		t.Error("a fresh lookup was permitted even though the cached address worked")
 	}
-	if calls[0].addr != "192.168.3.61:443" {
+	if calls[0].addr != "192.168.1.10:443" {
 		t.Errorf("fallback saw addr %q; want the failed original address", calls[0].addr)
 	}
 }
@@ -162,7 +162,7 @@ func TestRefreshAfterCachedAddressFails(t *testing.T) {
 	base := newRecordingBase("[2001:db8::2]:443")
 	d := New(fb, t.Logf, base.dial, nil)
 
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err != nil {
 		t.Fatalf("DialContext: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestRefreshAfterCachedAddressFails(t *testing.T) {
 		t.Errorf("call order wrong: allowLookup flags = %v, %v; want false, true",
 			calls[0].allowLookup, calls[1].allowLookup)
 	}
-	wantDials := []string{"192.168.3.61:443", "[2001:db8::1]:443", "[2001:db8::2]:443"}
+	wantDials := []string{"192.168.1.10:443", "[2001:db8::1]:443", "[2001:db8::2]:443"}
 	if got := base.dialsSnapshot(); !equalStrings(got, wantDials) {
 		t.Errorf("base dials = %v; want %v", got, wantDials)
 	}
@@ -189,7 +189,7 @@ func TestNoInfiniteRetryAndOriginalErrorPreserved(t *testing.T) {
 	base := newRecordingBase() // nothing succeeds
 	d := New(fb, t.Logf, base.dial, nil)
 
-	_, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	_, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err == nil {
 		t.Fatal("DialContext succeeded; want failure")
 	}
@@ -237,7 +237,7 @@ func TestNonTCPNeverConsultsFallback(t *testing.T) {
 	d := New(fb, t.Logf, base.dial, nil)
 
 	for _, network := range []string{"udp", "udp4", "udp6", "unix"} {
-		if _, err := d.DialContext(context.Background(), network, "192.168.3.61:443"); err == nil {
+		if _, err := d.DialContext(context.Background(), network, "192.168.1.10:443"); err == nil {
 			t.Fatalf("dial %s unexpectedly succeeded", network)
 		}
 	}
@@ -268,7 +268,7 @@ func TestFallbackErrorFailsClosed(t *testing.T) {
 	base := newRecordingBase()
 	d := New(fb, t.Logf, base.dial, nil)
 
-	_, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	_, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err == nil {
 		t.Fatal("DialContext succeeded; want failure")
 	}
@@ -279,10 +279,10 @@ func TestFallbackErrorFailsClosed(t *testing.T) {
 
 // A nil Fallback (feature never wired up) is a transparent pass-through.
 func TestNilFallbackIsPassThrough(t *testing.T) {
-	base := newRecordingBase("192.168.3.61:443")
+	base := newRecordingBase("192.168.1.10:443")
 	d := New(nil, t.Logf, base.dial, nil)
 
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:443")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:443")
 	if err != nil {
 		t.Fatalf("DialContext: %v", err)
 	}
@@ -526,7 +526,7 @@ func TestWorkingOverrideIsReusedForLaterDials(t *testing.T) {
 	d := New(fb, t.Logf, base.dial, nil)
 
 	for i := 0; i < 3; i++ {
-		c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+		c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:5007")
 		if err != nil {
 			t.Fatalf("dial %d: %v", i, err)
 		}
@@ -540,7 +540,7 @@ func TestWorkingOverrideIsReusedForLaterDials(t *testing.T) {
 	}
 	normalAttempts := 0
 	for _, a := range base.dialsSnapshot() {
-		if a == "192.168.3.61:5007" {
+		if a == "192.168.1.10:5007" {
 			normalAttempts++
 		}
 	}
@@ -571,7 +571,7 @@ func TestStickyOverrideIsAbandonedWhenItStopsWorking(t *testing.T) {
 	fb := &fakeFallback{cached: ln.Addr().String(), refreshed: ln.Addr().String()}
 	d := New(fb, t.Logf, base.dial, nil)
 
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:5007")
 	if err != nil {
 		t.Fatalf("first dial: %v", err)
 	}
@@ -586,7 +586,7 @@ func TestStickyOverrideIsAbandonedWhenItStopsWorking(t *testing.T) {
 	fb.cached, fb.refreshed = "", ""
 	fb.mu.Unlock()
 
-	if _, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007"); err == nil {
+	if _, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:5007"); err == nil {
 		t.Fatal("expected failure once neither path works")
 	} else if !strings.Contains(err.Error(), "connection refused") {
 		t.Errorf("want the original error surfaced, got %v", err)
@@ -610,7 +610,7 @@ func TestBlackHoledPrivateAddressDoesNotStallTheDial(t *testing.T) {
 	d := New(fb, t.Logf, blackhole, nil)
 
 	start := time.Now()
-	c, err := d.DialContext(context.Background(), "tcp", "192.168.3.61:5007")
+	c, err := d.DialContext(context.Background(), "tcp", "192.168.1.10:5007")
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
@@ -625,7 +625,7 @@ func TestBlackHoledPrivateAddressDoesNotStallTheDial(t *testing.T) {
 func TestPublicDestinationsAreNotBounded(t *testing.T) {
 	fb := &fakeFallback{}
 	d := New(fb, t.Logf, newRecordingBase().dial, nil)
-	if d.shouldBoundFirstAttempt("tcp", "192.168.3.61:5007") != true {
+	if d.shouldBoundFirstAttempt("tcp", "192.168.1.10:5007") != true {
 		t.Error("a private address should be bounded")
 	}
 	for _, addr := range []string{"1.2.3.4:443", "[2606:4700::1]:443", "[2409:8a00::1]:5007"} {
@@ -633,7 +633,7 @@ func TestPublicDestinationsAreNotBounded(t *testing.T) {
 			t.Errorf("%s is public and must not be bounded", addr)
 		}
 	}
-	if d.shouldBoundFirstAttempt("udp", "192.168.3.61:5007") {
+	if d.shouldBoundFirstAttempt("udp", "192.168.1.10:5007") {
 		t.Error("non-TCP must not be bounded")
 	}
 }

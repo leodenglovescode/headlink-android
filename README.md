@@ -29,10 +29,10 @@ for the architecture, security model, and limitations.
 
 | | |
 | --- | --- |
+| [Getting started](docs/getting-started.md) | Install, connect to your Headscale server, and optionally set up IPv6 discovery |
 | [Private Headscale IPv6 Discovery](docs/private-headscale-ipv6-discovery.md) | How the feature works, why TLS identity is preserved by construction, the security model, and its limits |
 | [FAQ and quirks](docs/faq.md) | Android, build and deployment behaviour that wastes hours if you meet it cold |
-| [CLAUDE.md](CLAUDE.md) | Build environment, rebase-fragile touch points, rules that must not regress |
-| [AGENTS.md](AGENTS.md) | The fork's maintenance rules |
+| [AGENTS.md](AGENTS.md) | Maintenance rules, build environment, rebase-fragile touch points |
 
 Everything below is upstream documentation, kept as-is. It refers to the official Tailscale app;
 Headlink is not distributed through any of the channels it mentions, and is built from source.
