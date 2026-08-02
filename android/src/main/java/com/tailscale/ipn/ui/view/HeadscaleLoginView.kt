@@ -139,6 +139,13 @@ fun HeadscaleLoginView(
                 onClick = { submit() },
                 content = { Text(stringResource(R.string.headscale_connect)) })
           })
+
+      // Logging out lives here because Headlink has no accounts screen to put it on.
+      if (model.isLoggedIn()) {
+        Lists.SectionDivider()
+        Setting.Text(
+            R.string.log_out, destructive = true, onClick = { model.logout { onNavigateHome() } })
+      }
     }
   }
 }

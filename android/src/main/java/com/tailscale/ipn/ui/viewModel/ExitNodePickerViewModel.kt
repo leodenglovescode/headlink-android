@@ -22,10 +22,6 @@ import kotlinx.coroutines.launch
 data class ExitNodePickerNav(
     val onNavigateBackHome: () -> Unit,
     val onNavigateBackToExitNodes: () -> Unit,
-    val onNavigateToMullvad: () -> Unit,
-    val onNavigateToMullvadInfo: () -> Unit,
-    val onNavigateBackToMullvad: () -> Unit,
-    val onNavigateToMullvadCountry: (String) -> Unit,
     val onNavigateToRunAsExitNode: () -> Unit,
 )
 

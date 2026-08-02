@@ -76,9 +76,6 @@ import com.tailscale.ipn.ui.view.MDMSettingsDebugView
 import com.tailscale.ipn.ui.view.MainView
 import com.tailscale.ipn.ui.view.MainViewNavigation
 import com.tailscale.ipn.ui.view.ManagedByView
-import com.tailscale.ipn.ui.view.MullvadExitNodePicker
-import com.tailscale.ipn.ui.view.MullvadExitNodePickerList
-import com.tailscale.ipn.ui.view.MullvadInfoView
 import com.tailscale.ipn.ui.view.NotificationsView
 import com.tailscale.ipn.ui.view.PeerDetails
 import com.tailscale.ipn.ui.view.PermissionsView
@@ -92,8 +89,6 @@ import com.tailscale.ipn.ui.view.SubnetRoutingView
 import com.tailscale.ipn.ui.view.TaildropDirView
 import com.tailscale.ipn.ui.view.TaildropDirectoryPickerPrompt
 import com.tailscale.ipn.ui.view.TailnetLockSetupView
-import com.tailscale.ipn.ui.view.UserSwitcherNav
-import com.tailscale.ipn.ui.view.UserSwitcherView
 import com.tailscale.ipn.ui.viewModel.AppViewModel
 import com.tailscale.ipn.ui.viewModel.ExitNodePickerNav
 import com.tailscale.ipn.ui.viewModel.MainViewModel
@@ -312,7 +307,7 @@ class MainActivity : ComponentActivity() {
                           },
                           onNavigateToMDMSettings = { navController.navigate("mdmSettings") },
                           onNavigateToManagedBy = { navController.navigate("managedBy") },
-                          onNavigateToUserSwitcher = { navController.navigate("userSwitcher") },
+                          onNavigateToServerSetup = { navController.navigate("headscaleLogin") },
                           onNavigateToPermissions = { navController.navigate("permissions") },
                           onBackToSettings = backTo("settings"),
                           onNavigateBackHome = backTo("main"))
@@ -322,16 +317,7 @@ class MainActivity : ComponentActivity() {
                             navController.popBackStack(route = "main", inclusive = false)
                           },
                           onNavigateBackToExitNodes = backTo("exitNodes"),
-                          onNavigateToMullvad = { navController.navigate("mullvad") },
-                          onNavigateToMullvadInfo = { navController.navigate("mullvad_info") },
-                          onNavigateBackToMullvad = backTo("mullvad"),
-                          onNavigateToMullvadCountry = { navController.navigate("mullvad/$it") },
                           onNavigateToRunAsExitNode = { navController.navigate("runExitNode") })
-                  val userSwitcherNav =
-                      UserSwitcherNav(
-                          backToSettings = backTo("settings"),
-                          onNavigateHome = backTo("main"),
-                          onNavigateToServerSetup = { navController.navigate("headscaleLogin") })
 
                   composable("main", enterTransition = { fadeIn(animationSpec = tween(150)) }) {
                     MainView(
@@ -353,15 +339,6 @@ class MainActivity : ComponentActivity() {
                   }
                   composable("exitNodes") { ExitNodePicker(exitNodePickerNav) }
                   composable("health") { HealthView(backTo("main")) }
-                  composable("mullvad") { MullvadExitNodePickerList(exitNodePickerNav) }
-                  composable("mullvad_info") { MullvadInfoView(exitNodePickerNav) }
-                  composable(
-                      "mullvad/{countryCode}",
-                      arguments =
-                          listOf(navArgument("countryCode") { type = NavType.StringType })) {
-                        MullvadExitNodePicker(
-                            it.arguments!!.getString("countryCode")!!, exitNodePickerNav)
-                      }
                   composable("runExitNode") { RunExitNodeView(exitNodePickerNav) }
                   composable(
                       "peerDetails/{nodeId}",
@@ -380,7 +357,6 @@ class MainActivity : ComponentActivity() {
                   composable("about") { AboutView(backTo("settings")) }
                   composable("mdmSettings") { MDMSettingsDebugView(backTo("settings")) }
                   composable("managedBy") { ManagedByView(backTo("settings")) }
-                  composable("userSwitcher") { UserSwitcherView(userSwitcherNav) }
                   composable("permissions") {
                     PermissionsView(
                         backTo("settings"),
@@ -398,7 +374,7 @@ class MainActivity : ComponentActivity() {
                     IntroView(backTo("main"))
                   }
                   composable("headscaleLogin") {
-                    HeadscaleLoginView(onNavigateHome = backTo("main"), backTo("userSwitcher"))
+                    HeadscaleLoginView(onNavigateHome = backTo("main"), backTo("settings"))
                   }
                 }
             if (isIntroScreenViewedSet()) {

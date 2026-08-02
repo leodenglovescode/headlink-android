@@ -23,7 +23,7 @@ data class SettingsNav(
     val onNavigateToPrivateDiscovery: () -> Unit,
     val onNavigateToMDMSettings: () -> Unit,
     val onNavigateToManagedBy: () -> Unit,
-    val onNavigateToUserSwitcher: () -> Unit,
+    val onNavigateToServerSetup: () -> Unit,
     val onNavigateToPermissions: () -> Unit,
     val onNavigateBackHome: () -> Unit,
     val onBackToSettings: () -> Unit,

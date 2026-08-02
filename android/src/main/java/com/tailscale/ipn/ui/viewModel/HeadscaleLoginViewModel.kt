@@ -44,6 +44,10 @@ class HeadscaleLoginViewModel : IpnViewModel() {
 
     val prefs = Ipn.MaskedPrefs()
     prefs.ControlURL = url
+    // Headscale deployments generally do not run MagicDNS, and inheriting the coordination
+    // server's DNS settings on a self-hosted setup tends to break name resolution rather than
+    // improve it. Off by default; still switchable under Settings -> DNS.
+    prefs.CorpDNS = false
 
     val key = authKey.trim().ifEmpty { null }
     if (key != null) {
@@ -56,6 +60,9 @@ class HeadscaleLoginViewModel : IpnViewModel() {
           .onSuccess { onSuccess() }
     }
   }
+
+  /** Whether a server is currently configured, which is what makes logging out meaningful. */
+  fun isLoggedIn(): Boolean = loggedInUser.value?.ID?.isNotEmpty() == true
 
   /**
    * A deliberately loose check.

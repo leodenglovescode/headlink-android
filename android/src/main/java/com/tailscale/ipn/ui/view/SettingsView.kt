@@ -73,12 +73,10 @@ fun SettingsView(
         Header(titleRes = R.string.settings_title, onBack = settingsNav.onNavigateBackHome)
       }) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).verticalScroll(rememberScrollState())) {
-          if (isVPNPrepared) {
-            UserView(
-                profile = user,
-                actionState = UserActionState.NAV,
-                onClick = settingsNav.onNavigateToUserSwitcher)
-          }
+          // Headlink has no notion of accounts: there is one self-hosted Headscale server, and
+          // this row is how you point at it or re-authenticate against it.
+          Setting.Text(
+              R.string.headscale_change_server, onClick = settingsNav.onNavigateToServerSetup)
 
           if (isAdmin && !isAndroidTV()) {
             Lists.ItemDivider()
