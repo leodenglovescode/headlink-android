@@ -94,6 +94,35 @@ jobs:
             exit 1
           fi
 
+      # Android refuses to install an APK whose versionCode is lower than the
+      # installed one, and cannot tell two builds apart when it is equal. The
+      # literal in build.gradle only moves when someone runs
+      # `make bump-version-code`, which CI does not, so without this every
+      # build would claim to be the same version. Stamped in the runner's
+      # checkout only and never committed.
+      - name: Stamp version
+        id: version
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"          # a deliberate, hand-cut release
+          else
+            tag="v0.1.$GITHUB_RUN_NUMBER"   # an ordinary push to main
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          # Minutes since the epoch, times ten — the same scheme as
+          # `make bump-version-code`. Wall-clock time is monotonic, so this can
+          # never go backwards between builds. The last digit is reserved for
+          # the build variant, and 0 means phone.
+          code=$(( $(date +%s) / 60 * 10 ))
+          sed -i -E "s/versionCode [0-9]+/versionCode $code/" android/build.gradle
+          if ! grep -qE "versionCode $code" android/build.gradle; then
+            echo "::error::Failed to stamp versionCode; the literal in android/build.gradle may have changed shape."
+            exit 1
+          fi
+          echo "::notice::Building $tag with versionCode $code"
+
       - name: Build signed release APK
         if: steps.signing.outputs.available == 'true'
         env:
@@ -135,10 +164,11 @@ jobs:
       # notice inline, and the "not an official Tailscale application" line is
       # the no-endorsement condition.
       - name: Publish release
-        if: steps.signing.outputs.available == 'true' && startsWith(github.ref, 'refs/tags/v')
+        if: steps.signing.outputs.available == 'true' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main')
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
           # Version the asset so downloads are self-identifying once saved.
           cp headlink-release.apk "headlink-$TAG.apk"
@@ -160,11 +190,20 @@ jobs:
           file attached to this release. This software is provided "as is",
           without warranty of any kind.
           EOF
-          gh release create "$TAG" \
-            --title "Headlink $TAG" \
-            --notes-file "$RUNNER_TEMP/notes.md" \
-            "headlink-$TAG.apk" \
-            LICENSE
+          # gh creates the tag itself from --target, so no tag has to be
+          # managed by hand. A tag created through the API with GITHUB_TOKEN
+          # deliberately does not trigger another workflow run, so this cannot
+          # loop. Re-running a build replaces the assets instead of failing.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "headlink-$TAG.apk" LICENSE --clobber
+          else
+            gh release create "$TAG" \
+              --target "$SHA" \
+              --title "Headlink $TAG" \
+              --notes-file "$RUNNER_TEMP/notes.md" \
+              "headlink-$TAG.apk" \
+              LICENSE
+          fi
 
       - name: Remove signing key
         if: always()
