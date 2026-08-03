@@ -483,14 +483,17 @@ fun ConnectView(
               text = stringResource(id = R.string.machine_auth_explainer),
               style = MaterialTheme.typography.bodyMedium,
               textAlign = TextAlign.Center)
-          Spacer(modifier = Modifier.size(1.dp))
-          selfNode?.let {
-            PrimaryActionButton(onClick = { loginAtUrlAction(it.nodeAdminUrl) }) {
-              Text(
-                  text = stringResource(id = R.string.open_admin_console),
-                  fontSize = MaterialTheme.typography.titleMedium.fontSize)
-            }
-          }
+          // Upstream offers an "Open admin console" button here, opening
+          // login.tailscale.com/admin/machines/<ip>. A Headscale node is
+          // approved from Headscale's own command line, and this device's
+          // address means nothing to Tailscale's console, so the button could
+          // only lead somewhere useless. The explainer above says what to do
+          // instead; there is no URL worth substituting.
+          //
+          // ConnectView keeps its loginAtUrlAction and selfNode parameters even
+          // though nothing here reads them now. They are upstream's shape, and
+          // unpicking them would ripple through MainActivity for no gain in
+          // two of the files a rebase most often lands on.
         } else if (state != Ipn.State.NeedsLogin && user != null && !user.isEmpty()) {
           Icon(
               painter = painterResource(id = R.drawable.power),

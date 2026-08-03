@@ -77,7 +77,7 @@
     <string name="deviceKeyExpires">Device key expires %s</string>
     <string name="deviceKeyExpired">Device key expired %s</string>
     <string name="machine_auth_required">Admin approval required</string>
-    <string name="machine_auth_explainer">This device must be approved by an administrator before it can connect to the tailnet.</string>
+    <string name="machine_auth_explainer">This device must be approved on your Headscale server before it can connect. Approve it from the Headscale command line, then reconnect.</string>
     <string name="open_admin_console">Open admin console</string>
     <string name="needs_machine_auth">Authorization required</string>
     <string name="disable">Disable</string>
