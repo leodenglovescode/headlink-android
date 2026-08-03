@@ -4,7 +4,6 @@
 package com.tailscale.ipn.ui.viewModel
 
 import androidx.lifecycle.viewModelScope
-import com.tailscale.ipn.App
 import com.tailscale.ipn.ui.localapi.Client
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.ui.util.LoadingIndicator
@@ -36,11 +35,8 @@ class SettingsViewModel : IpnViewModel() {
   val tailNetLockEnabled: StateFlow<Boolean?> = MutableStateFlow(null)
   // True if tailscaleDNS is enabled. nil if not yet known.
   val corpDNSEnabled: StateFlow<Boolean?> = MutableStateFlow(null)
-  val isClientRemoteLoggingEnabled: StateFlow<Boolean> = MutableStateFlow(true)
 
   init {
-    isClientRemoteLoggingEnabled.set(App.get().isClientLoggingEnabled())
-
     viewModelScope.launch {
       Notifier.netmap.collect { netmap -> isAdmin.set(netmap?.SelfNode?.isAdmin ?: false) }
     }
@@ -56,10 +52,5 @@ class SettingsViewModel : IpnViewModel() {
         it?.let { corpDNSEnabled.set(it.CorpDNS) } ?: run { corpDNSEnabled.set(null) }
       }
     }
-  }
-
-  fun toggleIsClientRemoteLoggingEnabled() {
-    isClientRemoteLoggingEnabled.set(!isClientRemoteLoggingEnabled.value)
-    App.get().updateIsClientLoggingEnabled(isClientRemoteLoggingEnabled.value)
   }
 }

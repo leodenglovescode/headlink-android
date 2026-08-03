@@ -8,18 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
@@ -64,8 +60,6 @@ fun SettingsView(
   val isVPNPrepared by appViewModel.vpnPrepared.collectAsState()
   val showTailnetLock by MDMSettings.manageTailnetLock.flow.collectAsState()
   val useTailscaleSubnets by MDMSettings.useTailscaleSubnets.flow.collectAsState()
-  val isClientRemoteLoggingEnabled by viewModel.isClientRemoteLoggingEnabled.collectAsState()
-  var showDisableLoggingDialog by remember { mutableStateOf(false) }
   val isPrivateDiscoveryEnabled = remember { PrivateDiscovery.config().enabled }
 
   Scaffold(
@@ -124,23 +118,9 @@ fun SettingsView(
                       else R.string.private_discovery_settings_subtitle_off),
               onClick = settingsNav.onNavigateToPrivateDiscovery)
 
-          Lists.SectionDivider()
-          Setting.Switch(
-              R.string.client_remote_logging_enabled,
-              subtitle =
-                  stringResource(
-                      if (MDMSettings.isMDMConfigured)
-                          R.string.client_remote_logging_enabled_subtitle_mdm
-                      else R.string.client_remote_logging_enabled_subtitle),
-              isOn = isClientRemoteLoggingEnabled,
-              enabled = !MDMSettings.isMDMConfigured,
-              onToggle = {
-                if (isClientRemoteLoggingEnabled) {
-                  showDisableLoggingDialog = true
-                } else {
-                  viewModel.toggleIsClientRemoteLoggingEnabled()
-                }
-              })
+          // The remote-client-logging switch is gone: Headlink uploads nothing,
+          // so a control offering to turn uploads off could only mislead. The
+          // guarantee is in libtailscale/notelemetry, not in a preference.
 
           if (!AndroidTVUtil.isAndroidTV()) {
             Lists.ItemDivider()
@@ -171,29 +151,6 @@ fun SettingsView(
           }
         }
       }
-
-  if (showDisableLoggingDialog) {
-    AlertDialog(
-        onDismissRequest = { showDisableLoggingDialog = false },
-        title = { Text(stringResource(R.string.client_remote_logging_disable_confirm_title)) },
-        text = { Text(stringResource(R.string.client_remote_logging_disable_confirm_message)) },
-        confirmButton = {
-          TextButton(
-              onClick = {
-                showDisableLoggingDialog = false
-                viewModel.toggleIsClientRemoteLoggingEnabled()
-              }) {
-                Text(
-                    stringResource(R.string.client_remote_logging_disable_confirm_button),
-                    color = MaterialTheme.colorScheme.error)
-              }
-        },
-        dismissButton = {
-          TextButton(onClick = { showDisableLoggingDialog = false }) {
-            Text(stringResource(R.string.cancel))
-          }
-        })
-  }
 }
 
 object Setting {

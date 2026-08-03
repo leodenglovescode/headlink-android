@@ -66,13 +66,16 @@ android {
         versionName getVersionProperty("VERSION_LONG")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // This setting, which defaults to 'true', will cause Tailscale to fall
-        // back to the Google DNS servers if it cannot determine what the
-        // operating system's DNS configuration is.
+        // Upstream defaults this to 'true', which sends DNS queries to Google's
+        // resolvers whenever the operating system's own DNS configuration
+        // cannot be determined. Headlink defaults it off: a client built to
+        // keep a home network's addressing private should not fail open to a
+        // third-party resolver, and doing so silently is worse than not
+        // resolving at all.
         //
-        // Set it to false either here or in your local.properties file to
-        // disable this behaviour.
-        buildConfigField "boolean", "USE_GOOGLE_DNS_FALLBACK", getLocalProperty("tailscale.useGoogleDnsFallback", "true")
+        // Set tailscale.useGoogleDnsFallback=true in local.properties to
+        // restore upstream's behaviour.
+        buildConfigField "boolean", "USE_GOOGLE_DNS_FALLBACK", getLocalProperty("tailscale.useGoogleDnsFallback", "false")
     }
 
     compileOptions {

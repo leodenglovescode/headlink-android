@@ -122,6 +122,22 @@ git rebase upstream/main
 git log --oneline upstream/main..main   # the fork's entire delta
 ```
 
+## No telemetry
+
+Headlink uploads nothing. Upstream configures logtail to send client logs and metrics to
+`log.tailscale.io` and enables it by default; here the upload is off in two independent ways —
+`logtail.Config.Disabled` is hardcoded true, and logtail's HTTP client uses
+`notelemetry.Transport`, which fails every request without opening a socket. Do not "restore" the
+user preference: `SetClientLoggingEnabled` is a no-op on purpose and the Settings switch was
+removed, because a control that changes nothing misleads.
+
+`notelemetry.Transport` must return an error rather than a synthetic success. logtail treats a 2xx
+as delivered and drops the buffered lines, so faking one would silently discard the on-device log
+instead of merely withholding the upload. `libtailscale` requires the NDK and is excluded from
+`make go-test`, which is why this lives in its own package with its own tests.
+
+`USE_GOOGLE_DNS_FALLBACK` likewise defaults to false here, against upstream's true.
+
 ## Never commit deployment specifics
 
 Real hostnames, public IP addresses, LAN addresses, ports, certificates, secrets and node names

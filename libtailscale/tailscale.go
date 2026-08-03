@@ -11,8 +11,9 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/tailscale/tailscale-android/libtailscale/notelemetry"
+
 	"tailscale.com/health"
-	"tailscale.com/logpolicy"
 	"tailscale.com/logtail"
 	"tailscale.com/logtail/filch"
 	"tailscale.com/net/netmon"
@@ -114,13 +115,13 @@ func (a *App) isClientLoggingEnabled() bool {
 	return isClientLoggingEnabled
 }
 
-// SetupLogs sets up remote logging.
+// setupLogs sets up logging. Nothing is uploaded; see the notelemetry package.
 func (b *backend) setupLogs(logDir string, logID logid.PrivateID, logf logger.Logf, health *health.Tracker, enableUpload bool) {
 	if b.netMon == nil {
 		panic("netMon must be created prior to SetupLogs")
 	}
-	transport := logpolicy.NewLogtailTransport(logtail.DefaultHost, b.netMon, health, log.Printf)
-
+	// No transport to log.tailscale.io is constructed at all. See the
+	// notelemetry package.
 	logcfg := logtail.Config{
 		Collection:          logtail.CollectionNode,
 		PrivateID:           logID,
@@ -128,12 +129,11 @@ func (b *backend) setupLogs(logDir string, logID logid.PrivateID, logf logger.Lo
 		MetricsDelta:        clientmetric.EncodeLogTailMetricsDelta,
 		IncludeProcID:       true,
 		IncludeProcSequence: true,
-		HTTPC:               &http.Client{Transport: transport},
+		HTTPC:               &http.Client{Transport: notelemetry.Transport{}},
 		CompressLogs:        true,
-		// Start the logger disabled if the user opted out, so not even
-		// the internal "logtail started" banner reaches the server. The
-		// SetClientLoggingEnabled path flips this at runtime.
-		Disabled: !enableUpload,
+		// Headlink uploads nothing, ever. enableUpload is ignored: it carried
+		// a user preference that no longer has anything to enable.
+		Disabled: true,
 	}
 	logcfg.FlushDelayFn = func() time.Duration { return 2 * time.Minute }
 
@@ -148,9 +148,7 @@ func (b *backend) setupLogs(logDir string, logID logid.PrivateID, logf logger.Lo
 	}
 
 	b.logger = logtail.NewLogger(logcfg, logf)
-	if !enableUpload {
-		log.Printf("remote log upload disabled by user preference")
-	}
+	log.Printf("remote log upload is disabled in this build")
 
 	log.SetFlags(0)
 	log.SetOutput(b.logger)

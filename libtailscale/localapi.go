@@ -111,11 +111,11 @@ func (app *App) NotifyPolicyChanged() {
 	app.policyStore.notifyChanged()
 }
 
-func (app *App) SetClientLoggingEnabled(enabled bool) {
-	if lg := app.logger.Load(); lg != nil {
-		lg.SetEnabled(enabled)
-	}
-}
+// SetClientLoggingEnabled is retained so the exported API keeps its shape, but
+// does nothing: Headlink never uploads logs, so there is no state to toggle.
+// Re-enabling the logger here would not restore uploads either — its transport
+// refuses every request. See the notelemetry package.
+func (app *App) SetClientLoggingEnabled(enabled bool) {}
 
 func (app *App) EditPrefs(prefs ipn.MaskedPrefs) (LocalAPIResponse, error) {
 	r, w := io.Pipe()
