@@ -132,11 +132,16 @@ jobs:
           HEADLINK_KEY_PASSWORD: ${{ secrets.HEADLINK_KEY_PASSWORD }}
         run: make release-apk
 
-      - name: Verify the APK is actually signed
+      # Every split is signed independently, so verifying only the universal one
+      # would leave the APK most people actually install unchecked.
+      - name: Verify the APKs are actually signed
         if: steps.signing.outputs.available == 'true'
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --print-certs headlink-release.apk
+          for apk in headlink-release*.apk; do
+            echo "== $apk"
+            "$APKSIGNER" verify --print-certs "$apk" | head -2
+          done
 
       - name: Build debug APK
         if: steps.signing.outputs.available != 'true'
@@ -149,7 +154,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: headlink-release-${{ github.sha }}
-          path: headlink-release.apk
+          path: headlink-release*.apk
           retention-days: 30
           if-no-files-found: error
 
@@ -174,12 +179,28 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
           SHA: ${{ github.sha }}
         run: |
-          # Version the asset so downloads are self-identifying once saved.
+          # Version every asset so a download is self-identifying once saved.
+          # The universal build keeps the plain name; the per-ABI ones keep
+          # their architecture, which is the only thing distinguishing them.
+          assets=()
           cp headlink-release.apk "headlink-$TAG.apk"
+          assets+=("headlink-$TAG.apk")
+          for apk in headlink-release-*.apk; do
+            abi="${apk#headlink-release-}"
+            abi="${abi%.apk}"
+            cp "$apk" "headlink-$TAG-$abi.apk"
+            assets+=("headlink-$TAG-$abi.apk")
+          done
           cat > "$RUNNER_TEMP/notes.md" <<EOF
-          Signed release APK for \`$TAG\`. Install it directly on the device;
-          it is signed with the Headlink release key, so it updates an existing
+          Signed release APKs for \`$TAG\`. Install directly on the device; they
+          are signed with the Headlink release key, so they update an existing
           install in place.
+
+          **Most phones want \`headlink-$TAG-arm64-v8a.apk\`** — every Android
+          device released in the last several years is arm64. It is a quarter
+          the size of the universal build, which carries the native library for
+          all four architectures at once. Take \`headlink-$TAG.apk\` only if you
+          do not know the device's architecture.
 
           ---
 
@@ -199,13 +220,13 @@ jobs:
           # deliberately does not trigger another workflow run, so this cannot
           # loop. Re-running a build replaces the assets instead of failing.
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "headlink-$TAG.apk" LICENSE --clobber
+            gh release upload "$TAG" "${assets[@]}" LICENSE --clobber
           else
             gh release create "$TAG" \
               --target "$SHA" \
               --title "Headlink $TAG" \
               --notes-file "$RUNNER_TEMP/notes.md" \
-              "headlink-$TAG.apk" \
+              "${assets[@]}" \
               LICENSE
           fi
 

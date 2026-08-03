@@ -38,6 +38,10 @@ ANDROID_BUILD_TOOLS_VERSION := $(shell grep '^androidBuildToolsVersion=' android
 
 DEBUG_APK := headlink-debug.apk
 RELEASE_APK := headlink-release.apk
+# Per-ABI release APKs, produced alongside the universal one by the `splits`
+# block in android/build.gradle. Must match the `include` list there.
+RELEASE_ABIS := arm64-v8a armeabi-v7a x86_64 x86
+RELEASE_ABI_APKS := $(foreach abi,$(RELEASE_ABIS),headlink-release-$(abi).apk)
 RELEASE_AAB := tailscale-release.aab
 RELEASE_TV_AAB := tailscale-tv-release.aab
 
@@ -156,9 +160,26 @@ release-apk: $(RELEASE_APK) ## Build a signed, non-debuggable release APK for si
 # without them the output is unsigned and Android will refuse to install it.
 # Unlike the debug APK this is not debuggable, so the stored secret and client
 # certificate cannot be read back over adb.
+# $(RELEASE_APK) is the universal build; the per-ABI ones are a side effect of
+# the same Gradle invocation, so they are copied out here rather than given
+# their own target that would rebuild everything a second time.
 $(RELEASE_APK): libtailscale version gradle-dependencies build-unstripped-aar
 	(cd android && ./gradlew assembleRelease)
-	install -C android/build/outputs/apk/release/android-release.apk $@
+	@# AGP appends -unsigned when no signing config applies, so both names have
+	@# to be accepted: CI always signs, an ordinary local build does not.
+	@for variant in universal $(RELEASE_ABIS); do \
+		base=android/build/outputs/apk/release/android-$$variant-release; \
+		if [ -f "$$base.apk" ]; then src="$$base.apk"; \
+		elif [ -f "$$base-unsigned.apk" ]; then src="$$base-unsigned.apk"; \
+		else \
+			echo "Expected $$base.apk; the splits block in android/build.gradle and RELEASE_ABIS disagree." >&2; \
+			exit 1; \
+		fi; \
+		if [ "$$variant" = universal ]; then dst=$(RELEASE_APK); else dst=headlink-release-$$variant.apk; fi; \
+		install -C "$$src" "$$dst" || exit 1; \
+	done
+	@echo "Release APKs:"
+	@ls -l $(RELEASE_APK) $(RELEASE_ABI_APKS) | awk '{printf "  %-34s %5.1f MB\n", $$9, $$5/1024/1024}'
 
 # Builds the release AAB and signs it (phone/tablet/chromeOS variant)
 .PHONY: release

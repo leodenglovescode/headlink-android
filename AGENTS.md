@@ -80,6 +80,13 @@ binary redistribution to carry the copyright notice and disclaimer. The release 
 from the workflow run number, so no tag is created by hand; a tag pushed deliberately names its
 own release instead.
 
+`assembleRelease` produces five APKs: one per ABI plus a universal build. The Go engine's
+`libgojni.so` is ~27-36 MB per architecture and is almost the whole APK, so an arm64-v8a device
+installs about 28 MB rather than 100 MB. `RELEASE_ABIS` in the Makefile must match the `include`
+list in the `splits` block, and both the signed (`android-<abi>-release.apk`) and unsigned
+(`…-release-unsigned.apk`) names are accepted, because a local build without keystore environment
+variables produces the latter.
+
 **Do not run `make bump-version-code` for a CI build, and do not commit a changed `versionCode`.**
 CI stamps that literal in its own checkout from wall-clock time, so every build is newer than the
 last and Android installs it over the previous one. Committing a version bump only creates rebase

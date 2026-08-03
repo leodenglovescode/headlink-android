@@ -126,6 +126,27 @@ android {
         }
     }
 
+    // The Go networking engine ships a libgojni.so per Android ABI, ~27-36 MB
+    // each, which is almost the entire size of the APK. Splitting by ABI means
+    // a device downloads only the one it can run: an arm64-v8a phone fetches
+    // roughly a quarter of what the combined APK costs.
+    //
+    // versionCode is deliberately left identical across the splits. Distinct
+    // per-ABI codes exist for the Play Store, which needs to order every
+    // upload in one track; these APKs are sideloaded, only ever one at a time,
+    // and offsetting them would collide with the variant digit that the
+    // versionCode literal above already reserves.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            // Kept so there is still a single build that installs anywhere,
+            // which is what to reach for when a device's ABI is unknown.
+            universalApk true
+        }
+    }
+
     buildTypes {
         applicationTest {
             initWith debug
