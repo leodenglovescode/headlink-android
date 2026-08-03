@@ -26,12 +26,19 @@ import kotlinx.coroutines.flow.StateFlow
 // DotsMatrix represents the state of the progress indicator.
 typealias DotsMatrix = List<List<Boolean>>
 
-// The initial DotsMatrix that represents the Tailscale logo (T-shaped).
+// The initial DotsMatrix that represents the Headlink logo (H-shaped): two
+// stems and a crossbar, the same mark as ic_headlink_launcher_foreground.xml
+// and docs/assets/headlink-logo.svg, rendered in this screen's dot grid.
+// Upstream's matrix drew Tailscale's T here.
+//
+// The composable keeps its TailscaleLogoView name deliberately. It is internal,
+// it appears at five call sites, and renaming it would cost a rebase conflict
+// at each one to change nothing a user can see.
 val logoDotsMatrix: DotsMatrix =
     listOf(
-        listOf(false, false, false),
+        listOf(true, false, true),
         listOf(true, true, true),
-        listOf(false, true, false),
+        listOf(true, false, true),
     )
 
 @Composable

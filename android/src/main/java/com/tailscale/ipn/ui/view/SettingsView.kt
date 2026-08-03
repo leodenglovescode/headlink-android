@@ -18,12 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tailscale.ipn.BuildConfig
@@ -32,8 +27,6 @@ import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.ShowHide
 import com.tailscale.ipn.privatediscovery.PrivateDiscovery
-import com.tailscale.ipn.ui.Links
-import com.tailscale.ipn.ui.theme.link
 import com.tailscale.ipn.ui.theme.listItem
 import com.tailscale.ipn.ui.util.AndroidTVUtil
 import com.tailscale.ipn.ui.util.AndroidTVUtil.isAndroidTV
@@ -50,10 +43,8 @@ fun SettingsView(
     viewModel: SettingsViewModel = viewModel(),
     appViewModel: AppViewModel = viewModel()
 ) {
-  val handler = LocalUriHandler.current
 
   val user by viewModel.loggedInUser.collectAsState()
-  val isAdmin by viewModel.isAdmin.collectAsState()
   val managedByOrganization by viewModel.managedByOrganization.collectAsState()
   val tailnetLockEnabled by viewModel.tailNetLockEnabled.collectAsState()
   val corpDNSEnabled by viewModel.corpDNSEnabled.collectAsState()
@@ -72,10 +63,12 @@ fun SettingsView(
           Setting.Text(
               R.string.headscale_change_server, onClick = settingsNav.onNavigateToServerSetup)
 
-          if (isAdmin && !isAndroidTV()) {
-            Lists.ItemDivider()
-            AdminTextView { handler.openUri(Links.ADMIN_URL) }
-          }
+          // Upstream shows a "manage your tailnet settings in the admin console"
+          // link here, pointing at login.tailscale.com. Headlink talks to a
+          // self-hosted Headscale server, which that page knows nothing about,
+          // so the link could only send someone to a login screen for an
+          // account they do not have. Headscale is administered from its own
+          // CLI, so there is no URL to substitute.
 
           Lists.SectionDivider()
           Setting.Text(
@@ -217,24 +210,6 @@ object Setting {
           TintedSwitch(checked = isOn, onCheckedChange = onToggle, enabled = enabled)
         })
   }
-}
-
-@Composable
-fun AdminTextView(onNavigateToAdminConsole: () -> Unit) {
-  val adminStr = buildAnnotatedString {
-    append(stringResource(id = R.string.settings_admin_prefix))
-
-    pushStringAnnotation(tag = "link", annotation = Links.ADMIN_URL)
-    withStyle(
-        style =
-            SpanStyle(
-                color = MaterialTheme.colorScheme.link,
-                textDecoration = TextDecoration.Underline)) {
-          append(stringResource(id = R.string.settings_admin_link))
-        }
-  }
-
-  Lists.InfoItem(adminStr, onClick = onNavigateToAdminConsole)
 }
 
 @Preview
