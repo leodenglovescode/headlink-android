@@ -101,8 +101,9 @@ fun AboutView(backToSettings: BackNavigation) {
             // link is what lets someone go and check.
             OpenURLButton(stringResource(R.string.about_view_upstream), Links.UPSTREAM_PROJECT_URL)
             OpenURLButton(stringResource(R.string.acknowledgements), Links.LICENSES_URL)
-            OpenURLButton(stringResource(R.string.privacy_policy), Links.PRIVACY_POLICY_URL)
-            OpenURLButton(stringResource(R.string.terms_of_service), Links.TERMS_URL)
+            // Tailscale's privacy policy and terms governed Tailscale's hosted
+            // service, which Headlink does not use and is not covered by.
+            // Linking them here implied a relationship that does not exist.
           }
 
           Text(
