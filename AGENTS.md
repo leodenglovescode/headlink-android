@@ -72,6 +72,20 @@ Changing any interface in `libtailscale/*.go` requires rebuilding the AAR (`make
 before Kotlin can see it. `android/build.gradle` sets `warningsAsErrors true` for lint, so lint
 regressions break the build.
 
+### Releases
+
+CI signs the release APK with a keystore held in repository secrets and, for a commit marked
+`[release]`, publishes it to the Releases page along with `LICENSE` — BSD-3-Clause requires a
+binary redistribution to carry the copyright notice and disclaimer. The release tag is derived
+from the workflow run number, so no tag is created by hand; a tag pushed deliberately names its
+own release instead.
+
+**Do not run `make bump-version-code` for a CI build, and do not commit a changed `versionCode`.**
+CI stamps that literal in its own checkout from wall-clock time, so every build is newer than the
+last and Android installs it over the previous one. Committing a version bump only creates rebase
+conflicts. `android/build.gradle` must keep `versionCode` as a bare integer literal on its own
+line; CI rewrites it with `sed` and fails the build if the shape changes.
+
 ## Git
 
 Do not commit, push, force-push, reset, delete branches, change remotes, or open PRs unless
@@ -84,6 +98,13 @@ Plain: subject line, blank line, body. **Never** append `Co-Authored-By`, `Claud
 
 Never `git push`, force-push, `reset --hard`, delete branches, change remotes or open PRs unless
 asked in that message. Committing when asked is fine.
+
+**A build is published only when its commit message contains `[release]`.** CI reads the pushed
+commit's message: without the marker it builds, signs and keeps the APK as a workflow artifact
+for thirty days, but creates no Release. Put the marker in the subject line of the commit that
+completes the work, never in an unrelated one — the marker publishes whatever tree that commit
+points at. Do not add it speculatively, and do not add it to a commit you were only asked to
+write and not to push.
 
 Work happens on `main`. Sync with upstream by rebasing, never merging, so the fork stays a clean
 stack of commits on top of upstream:

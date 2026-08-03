@@ -163,8 +163,12 @@ jobs:
       # materials provided with the distribution. The notes carry the same
       # notice inline, and the "not an official Tailscale application" line is
       # the no-endorsement condition.
+      # Publishing is opt-in per commit: most pushes to main are typo fixes and
+      # do not deserve a Release. Every build still produces the artifact above,
+      # so an unpublished build remains downloadable for thirty days. A tag
+      # pushed by hand always publishes — cutting one is already deliberate.
       - name: Publish release
-        if: steps.signing.outputs.available == 'true' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main')
+        if: steps.signing.outputs.available == 'true' && (github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')))
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
