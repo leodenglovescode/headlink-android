@@ -109,7 +109,8 @@ the client's `ServerName`, and that the chain verified.
 ## Connection algorithm
 
 With the feature **disabled**, `PrivateDiscovery.dialFallback` returns `""` immediately and
-behaviour is identical to upstream: no lookup requests, no alternate dialing.
+`PrivateDiscovery.boundedDialPort` returns 0, so behaviour is identical to upstream: no lookup
+requests, no alternate dialing, and no connect timeout that differs from the kernel's.
 
 With it **enabled**:
 
@@ -135,14 +136,29 @@ At most one cached attempt and one refresh attempt happen per failed dial. Whate
 The ordering above is correct but was, on its own, unusably slow. Three properties of the real
 control plane had to be accounted for, each found by tracing an actual connection from cellular.
 
-**The first attempt is bounded to 1.5s when the destination is a private address.** The
-coordination hostname resolves to a LAN address by design. Away from home that address is
-black-holed rather than refused, so the connect runs to the kernel's full SYN-retry timeout —
-76 seconds, measured — before the fallback gets a turn. A LAN answers in single-digit
-milliseconds, so the bound is never reached at home. It applies only to private destinations and
-only when a fallback exists; DERP, logtail and probe traffic keep the caller's own deadline. There
-is deliberately no unbounded retry when nothing works, since that would re-impose the stall on the
-case already failing, and the coordination client re-dials on its own schedule anyway.
+**The first attempt is bounded to 1.5s when the destination is the coordination server at a
+private address.** The coordination hostname resolves to a LAN address by design. Away from home
+that address is black-holed rather than refused, so the connect runs to the kernel's full SYN-retry
+timeout — 76 seconds, measured — before the fallback gets a turn. A LAN answers in single-digit
+milliseconds, so the bound is never reached at home. There is deliberately no unbounded retry when
+nothing works, since that would re-impose the stall on the case already failing, and the
+coordination client re-dials on its own schedule anyway.
+
+This is the only part of the feature that acts *before* a dial rather than after a failed one, so
+its scope is checked separately and more cheaply. `AppContext.PrivateDiscoveryBoundedDialPort`
+returns the coordination server's port, or 0, and all three of these must hold before the deadline
+is shortened:
+
+| Condition | Why |
+| --- | --- |
+| The destination is private, loopback or link-local | A public address is not what the hostname resolves to |
+| The feature is switched **on** with a custom server configured | Otherwise installing Headlink would change dialing for people not using the feature |
+| The port is the coordination server's own | Other private destinations are somebody else's traffic |
+
+The middle condition is what makes the Off switch honest. Without it, a shortened timeout would
+also reach the DNS forwarder dialing a LAN resolver over TCP, or `ipnlocal`'s Serve proxy on
+loopback — both ordinary `SystemDial` users on private addresses. The check answers from
+configuration already in memory: no name resolution, no sockets, nothing that can block a dial.
 
 **A discovered address that works is reused for two minutes.** The coordination client opens a new
 connection per request and probes several ports in parallel. Re-deriving the fallback for each one
@@ -378,6 +394,13 @@ with consecutive failures to a 30-minute ceiling.
   addresses, so DERP, logtail, captive-portal probes and everything else are untouched — and it
   never applies to the default Tailscale coordination server, nor when the control URL is already an
   IP literal.
+* **That check fails closed.** Name resolution inside the process stops working once the tunnel is
+  up without working routes, which is precisely when the feature engages, so the comparison set
+  falls back to addresses previously observed **for that exact hostname** — never to a weaker
+  signal such as the port alone. A matching port is not evidence: on 443 it would take in any
+  failed `SystemDial` connection. If the hostname has never resolved on the device, the hook simply
+  does not engage. Saving a server address resolves and remembers it up front so that the tunnel
+  being up later cannot leave the check with nothing to compare against.
 * **Nothing in this feature touches** peer endpoint selection, DERP selection or traffic, MagicDNS,
   subnet routes, exit nodes, peer hostnames, peer DNS, device DNS, or VPN routing.
 * **The lookup request itself** is a single small HTTPS GET issued on the underlying non-VPN

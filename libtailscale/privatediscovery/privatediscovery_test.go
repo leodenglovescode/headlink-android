@@ -32,6 +32,12 @@ type fakeFallback struct {
 	refreshed string
 	err       error
 
+	// boundPort is what PrivateDiscoveryBoundedDialPort reports. Tests that
+	// exercise the fallback set it to the coordination port they dial; zero
+	// means the feature is switched off, as it is on a stock install.
+	boundPort    int32
+	boundPortErr error
+
 	calls  []fakeCall
 	closed bool
 }
@@ -52,6 +58,15 @@ func (f *fakeFallback) PrivateDiscoveryDialFallback(failedAddr string, allowLook
 		return f.refreshed, nil
 	}
 	return f.cached, nil
+}
+
+func (f *fakeFallback) PrivateDiscoveryBoundedDialPort() (int32, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.boundPortErr != nil {
+		return 0, f.boundPortErr
+	}
+	return f.boundPort, nil
 }
 
 func (f *fakeFallback) callCount() int {
@@ -606,7 +621,7 @@ func TestBlackHoledPrivateAddressDoesNotStallTheDial(t *testing.T) {
 		<-ctx.Done() // never answers, like a dropped SYN
 		return nil, ctx.Err()
 	}
-	fb := &fakeFallback{cached: "[2001:db8::1]:5007"}
+	fb := &fakeFallback{cached: "[2001:db8::1]:5007", boundPort: 5007}
 	d := New(fb, t.Logf, blackhole, nil)
 
 	start := time.Now()
@@ -623,7 +638,7 @@ func TestBlackHoledPrivateAddressDoesNotStallTheDial(t *testing.T) {
 // The bound applies only to private destinations. DERP and similar public
 // traffic must keep the caller's own deadline.
 func TestPublicDestinationsAreNotBounded(t *testing.T) {
-	fb := &fakeFallback{}
+	fb := &fakeFallback{boundPort: 5007}
 	d := New(fb, t.Logf, newRecordingBase().dial, nil)
 	if d.shouldBoundFirstAttempt("tcp", "192.168.1.10:5007") != true {
 		t.Error("a private address should be bounded")
@@ -635,5 +650,52 @@ func TestPublicDestinationsAreNotBounded(t *testing.T) {
 	}
 	if d.shouldBoundFirstAttempt("udp", "192.168.1.10:5007") {
 		t.Error("non-TCP must not be bounded")
+	}
+}
+
+// Switching the feature off must restore upstream dialing exactly, and the
+// shortened connect timeout is the one part of it that runs before a dial
+// rather than after one. A stock install reports port 0 and must get the
+// kernel's timing on every destination, private ones included.
+func TestDisabledFeatureBoundsNothing(t *testing.T) {
+	d := New(&fakeFallback{boundPort: 0}, t.Logf, newRecordingBase().dial, nil)
+	for _, addr := range []string{
+		"192.168.1.10:5007",
+		"192.168.1.1:53", // the DNS forwarder reaching a LAN resolver over TCP
+		"127.0.0.1:8080", // ipnlocal's Serve proxy
+		"[fe80::1]:443",  // link-local
+	} {
+		if d.shouldBoundFirstAttempt("tcp", addr) {
+			t.Errorf("%s must not be bounded while the feature is off", addr)
+		}
+	}
+}
+
+// Even switched on, the bound belongs to the coordination server alone. Other
+// private destinations are somebody else's traffic and must be left with the
+// timing upstream would give them.
+func TestOnlyTheCoordinationPortIsBounded(t *testing.T) {
+	d := New(&fakeFallback{boundPort: 5007}, t.Logf, newRecordingBase().dial, nil)
+	if !d.shouldBoundFirstAttempt("tcp", "192.168.1.10:5007") {
+		t.Error("the coordination port should be bounded")
+	}
+	for _, addr := range []string{
+		"192.168.1.1:53",  // LAN resolver
+		"192.168.1.10:80", // the plaintext-upgrade probe, not the control port
+		"192.168.1.10:443",
+		"10.0.0.5:22",
+	} {
+		if d.shouldBoundFirstAttempt("tcp", addr) {
+			t.Errorf("%s is not the coordination server and must not be bounded", addr)
+		}
+	}
+}
+
+// The Kotlin side answers this one on a Go goroutine before every private dial.
+// If it ever throws, the safe reading is "not ours", not "bound it anyway".
+func TestBoundPortErrorFailsClosed(t *testing.T) {
+	d := New(&fakeFallback{boundPortErr: errors.New("boom")}, t.Logf, newRecordingBase().dial, nil)
+	if d.shouldBoundFirstAttempt("tcp", "192.168.1.10:5007") {
+		t.Error("an error from the host application must not shorten the dial")
 	}
 }

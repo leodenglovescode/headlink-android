@@ -495,6 +495,15 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     return PrivateDiscovery.dialFallback(failedAddr, allowLookup)
   }
 
+  /**
+   * Headlink: Private Headscale IPv6 Discovery.
+   *
+   * Called from the Go dialer before dialing, to decide whether a private destination should get a
+   * shortened connect timeout. Returns 0 whenever the feature is off, which is what keeps dialing
+   * byte-for-byte upstream in that case. See [PrivateDiscovery.boundedDialPort].
+   */
+  override fun privateDiscoveryBoundedDialPort(): Int = PrivateDiscovery.boundedDialPort()
+
   override fun getUserCACertsPEM(): ByteArray {
     val ks = java.security.KeyStore.getInstance("AndroidCAStore")
     ks.load(null)

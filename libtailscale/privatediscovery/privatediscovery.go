@@ -46,15 +46,23 @@
 //
 // This affects the coordination-server dial only. WireGuard peer traffic never
 // passes through tsdial.SystemDial (magicsock owns its own UDP sockets), and
-// unrelated SystemDial users such as DERP and logtail are filtered out by the
-// Fallback implementation, which returns "" for any address that is not one of
-// the configured control server's own resolved addresses.
+// unrelated SystemDial users — the DNS forwarder reaching upstream resolvers,
+// ipnlocal's Serve proxy, DERP — are filtered out by the Fallback
+// implementation, which returns "" for any address that is not one of the
+// configured control server's own resolved addresses.
+//
+// The one thing this package does before a dial rather than after it is
+// shorten the connect timeout, and that is scoped the same way: it applies only
+// when the feature is switched on, a custom coordination server is configured,
+// and the destination is a private address on that server's own port. With the
+// feature off, every dial behaves exactly as it does upstream.
 package privatediscovery
 
 import (
 	"context"
 	"net"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -83,8 +91,16 @@ import (
 //     applicable" / "unavailable". "" is not an error.
 //   - Neither the returned string nor the returned error may ever contain the
 //     shared secret or any other credential.
+//
+// PrivateDiscoveryBoundedDialPort answers a second, much narrower question,
+// asked BEFORE a dial rather than after one: "is there a configured
+// coordination server this feature could act for, and what port does it use?"
+// It returns that port, or 0 for "none — leave every dial exactly as upstream
+// would". It must be cheap and must never touch the network: unlike the
+// fallback, it is consulted on dials that have not failed yet.
 type Fallback interface {
 	PrivateDiscoveryDialFallback(failedAddr string, allowLookup bool) (string, error)
+	PrivateDiscoveryBoundedDialPort() (int32, error)
 }
 
 // Dialer wraps a base dial func with the private-discovery fallback.
@@ -223,15 +239,27 @@ func (d *Dialer) DialContext(ctx context.Context, network, addr string) (net.Con
 // shouldBoundFirstAttempt reports whether the first attempt should be given a
 // short deadline rather than the kernel's.
 //
-// Only private destinations qualify, and only when a fallback exists to switch
-// to. Public destinations — DERP, logtail, captive-portal probes — are left
-// strictly alone, since shortening those would change behaviour for traffic
-// this feature has no business touching.
+// Three conditions, all required:
+//
+//   - The destination is private, loopback or link-local. A public destination
+//     is not the address a Headscale hostname deliberately resolves to, and
+//     shortening one would change behaviour for traffic this feature has no
+//     business touching.
+//   - The feature is switched on and a custom coordination server is
+//     configured. Without this, merely installing Headlink would shorten
+//     unrelated private dials — the DNS forwarder reaching a LAN resolver over
+//     TCP, say — which contradicts the promise that Off is upstream behaviour.
+//   - The port is the coordination server's own. Private destinations on other
+//     ports belong to something else.
+//
+// Asking by port is what makes the second and third conditions answerable
+// before a dial at all: the Kotlin side reports them from configuration it
+// already holds, without the name resolution the post-failure scope check does.
 func (d *Dialer) shouldBoundFirstAttempt(network, addr string) bool {
 	if d.fb == nil || !strings.HasPrefix(network, "tcp") {
 		return false
 	}
-	host, _, err := net.SplitHostPort(addr)
+	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		return false
 	}
@@ -239,7 +267,20 @@ func (d *Dialer) shouldBoundFirstAttempt(network, addr string) bool {
 	if err != nil {
 		return false
 	}
-	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+	if !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() {
+		return false
+	}
+	// Asked last: it is the only one of the three that crosses into Kotlin, and
+	// the two cheap checks above reject the overwhelming majority of dials.
+	controlPort, err := d.fb.PrivateDiscoveryBoundedDialPort()
+	if err != nil || controlPort <= 0 {
+		return false
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return false
+	}
+	return port == int(controlPort)
 }
 
 func (d *Dialer) firstAttempt(ctx context.Context, network, addr string, bounded bool) (net.Conn, error) {

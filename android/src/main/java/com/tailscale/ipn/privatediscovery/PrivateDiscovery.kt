@@ -376,65 +376,139 @@ object PrivateDiscovery {
   // ------------------------------------------------------- control-host match
 
   /**
-   * Whether [failedIp] is one of the addresses the configured coordination-server hostname
-   * currently resolves to.
+   * The configured coordination server's overridable hostname and port, or null when there is
+   * nothing here for this feature to act on.
    *
-   * This is the scoping check that keeps the feature off every other connection the Tailscale core
-   * makes. It never applies to the default Tailscale coordination server, nor when the control URL
-   * is already an IP literal.
+   * "Overridable" excludes the default Tailscale coordination server, and excludes a control URL
+   * that is already an IP literal: the hostname *is* the TLS identity, so a literal leaves nothing
+   * to substitute a physical destination for.
    */
-  private fun isConfiguredControlServer(failedIp: InetAddress, failedPort: Int): Boolean {
+  private fun controlHostAndPort(): Pair<String, Int>? {
     val controlUrl = Notifier.prefs.value?.ControlURL?.trim().orEmpty()
-    if (controlUrl.isEmpty()) {
-      TSLog.d(TAG, "no control URL known yet")
-      return false
-    }
-    if (controlUrl == Links.DEFAULT_CONTROL_URL) return false
+    if (controlUrl.isEmpty()) return null
+    if (controlUrl == Links.DEFAULT_CONTROL_URL) return null
 
     val host =
         try {
           URI(controlUrl).host
         } catch (e: Exception) {
           null
-        } ?: return false
-    if (host.isBlank()) return false
-    // Already an IP literal: there is nothing to override.
-    if (looksLikeIpLiteral(host)) return false
-    if (host.equals("controlplane.tailscale.com", ignoreCase = true)) return false
+        } ?: return null
+    if (host.isBlank()) return null
+    if (looksLikeIpLiteral(host)) return null
+    if (host.equals("controlplane.tailscale.com", ignoreCase = true)) return null
+
+    val port = portOfUrl(controlUrl) ?: return null
+    return host to port
+  }
+
+  /**
+   * The coordination server's port when a dial to it could be shortened, or 0 when no dial should
+   * be treated differently from upstream.
+   *
+   * Called from Go (via `AppContext.PrivateDiscoveryBoundedDialPort`) *before* dialing, so unlike
+   * [dialFallback] it runs on connections that have not failed and mostly never will. It therefore
+   * reads configuration only: a preference and the already-loaded control URL. No resolution, no
+   * sockets, nothing that can block.
+   *
+   * Returning 0 while the feature is switched off is the whole point. The shortened timeout is a
+   * real behavioural change, and a switch labelled Off has to mean it.
+   */
+  fun boundedDialPort(): Int =
+      try {
+        if (!::appContext.isInitialized || !prefs().getBoolean(KEY_ENABLED, false)) 0
+        else controlHostAndPort()?.second ?: 0
+      } catch (e: Exception) {
+        // Runs on a Go goroutine; it must not be able to propagate anything.
+        0
+      }
+
+  /**
+   * Resolves the coordination hostname in [controlUrl] in the background and remembers the result.
+   *
+   * Called when a server address is saved, which is the one moment name resolution is reliably
+   * available: the tunnel is not up yet, and the user is by definition looking at the screen. That
+   * seeds the comparison set [isConfiguredControlServer] needs, so the feature does not have to
+   * fall back to weaker evidence later.
+   *
+   * Returns immediately, on its own thread rather than a caller's coroutine scope: the caller
+   * navigates away as soon as login succeeds, and a scope cancelled at that moment would defeat the
+   * point. Failure is silent and harmless — it only means the dial path fills the same cache on its
+   * own first attempt instead.
+   */
+  fun rememberControlHost(controlUrl: String) {
+    if (!::appContext.isInitialized) return
+    val host =
+        try {
+          URI(controlUrl.trim()).host
+        } catch (e: Exception) {
+          null
+        } ?: return
+    if (host.isBlank() || looksLikeIpLiteral(host)) return
+
+    Thread(
+            {
+              try {
+                // Discard the in-memory TTL entry so a changed server address is resolved now, not
+                // up
+                // to a minute from now.
+                resolved = null
+                if (resolveControlHost(host).isEmpty()) {
+                  TSLog.d(TAG, "could not resolve $host while saving the server address")
+                }
+              } catch (e: Exception) {
+                TSLog.d(TAG, "remembering $host failed: ${e.javaClass.simpleName}")
+              }
+            },
+            "private-discovery-resolve")
+        .apply { isDaemon = true }
+        .start()
+  }
+
+  /**
+   * Whether [failedIp] is one of the addresses the configured coordination-server hostname
+   * currently resolves to, or has previously resolved to on this device.
+   *
+   * This is the scoping check that keeps the feature off every other connection the Tailscale core
+   * makes. It never applies to the default Tailscale coordination server, nor when the control URL
+   * is already an IP literal.
+   */
+  private fun isConfiguredControlServer(failedIp: InetAddress, failedPort: Int): Boolean {
+    val hostAndPort = controlHostAndPort()
+    if (hostAndPort == null) {
+      TSLog.d(TAG, "no overridable coordination server is configured")
+      return false
+    }
+    val (host, controlPort) = hostAndPort
 
     // The coordination client probes more than one port in parallel — notably port 80 for the
     // plaintext upgrade path — and only the coordination server's own port can ever answer. Every
     // override offered for another port is a dial that cannot succeed, and the client's deadline
     // is shared, so those wasted attempts are what caused registration to time out behind a
     // successful key fetch.
-    val controlPort = portOfUrl(controlUrl)
-    if (controlPort != null && failedPort != controlPort) {
+    if (failedPort != controlPort) {
       TSLog.d(TAG, "failed dial is on port $failedPort, not the coordination port; ignoring")
       return false
     }
 
     val target = failedIp.address
     val resolved = resolveControlHost(host)
-    if (resolved.isNotEmpty()) {
-      val match = resolved.any { it.contentEquals(target) }
-      if (!match) {
-        // The coordination hostname's own addresses are not secret — the whole point is that they
-        // are the *published*, unroutable ones. The discovered address is never logged.
-        TSLog.d(TAG, "control host $host resolved to ${resolved.size} address(es), none matching")
-      }
-      return match
+    if (resolved.isEmpty()) {
+      // Nothing to compare against, so there is no evidence this dial belongs to the coordination
+      // server — only that it went to the same port, which on 443 is worth very little. Fail
+      // closed. resolveControlHost already falls back to addresses previously observed for this
+      // exact hostname, so reaching here means the hostname has never once resolved on this
+      // device; rememberControlHost seeds that at setup time precisely so it does not.
+      TSLog.d(TAG, "cannot resolve $host and none is remembered; ignoring the failed dial")
+      return false
     }
-
-    // Nothing to compare against. This is not an edge case: once the VPN interface is up with no
-    // working routes, name resolution inside this process fails outright, which is precisely the
-    // situation this feature exists for. The port has already been checked above, so accepting
-    // here still only ever applies to dials aimed at the coordination server's own port.
-    if (controlPort != null) {
-      TSLog.d(TAG, "cannot resolve $host; treating port $failedPort as the coordination server")
-      return true
+    val match = resolved.any { it.contentEquals(target) }
+    if (!match) {
+      // The coordination hostname's own addresses are not secret — the whole point is that they
+      // are the *published*, unroutable ones. The discovered address is never logged.
+      TSLog.d(TAG, "control host $host resolved to ${resolved.size} address(es), none matching")
     }
-    TSLog.d(TAG, "cannot resolve $host and its port is unknown; ignoring")
-    return false
+    return match
   }
 
   /**

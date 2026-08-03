@@ -104,6 +104,18 @@ type AppContext interface {
 	// See libtailscale/privatediscovery and
 	// docs/private-headscale-ipv6-discovery.md.
 	PrivateDiscoveryDialFallback(failedAddr string, allowLookup bool) (string, error)
+
+	// PrivateDiscoveryBoundedDialPort is a Headlink fork addition supporting the
+	// same feature. It returns the port of the configured coordination server
+	// when private discovery is switched on and could act on a failed dial to
+	// it, and 0 otherwise — including whenever the feature is off, so that
+	// disabling it restores upstream dialing behaviour exactly.
+	//
+	// Unlike PrivateDiscoveryDialFallback this is consulted BEFORE a dial, on
+	// connections that have not failed and mostly never will. The Java side
+	// must answer it from configuration it already holds, without resolving
+	// names, opening sockets or blocking on anything.
+	PrivateDiscoveryBoundedDialPort() (int32, error)
 }
 
 // IPNService corresponds to our IPNService in Java.

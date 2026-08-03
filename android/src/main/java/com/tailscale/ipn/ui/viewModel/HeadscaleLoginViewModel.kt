@@ -3,6 +3,7 @@
 
 package com.tailscale.ipn.ui.viewModel
 
+import com.tailscale.ipn.privatediscovery.PrivateDiscovery
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.ui.util.set
@@ -41,6 +42,12 @@ class HeadscaleLoginViewModel : IpnViewModel() {
       errorDialog.set(ErrorDialogType.INVALID_CUSTOM_URL)
       return
     }
+
+    // Resolve and remember the server's addresses while resolution still works. Away from home,
+    // once the tunnel is half-established, it often does not — and that is exactly when the
+    // discovery hook needs to know whether a failed dial belongs to this server. Returns
+    // immediately; the login below does not depend on it.
+    PrivateDiscovery.rememberControlHost(url)
 
     val prefs = Ipn.MaskedPrefs()
     prefs.ControlURL = url
