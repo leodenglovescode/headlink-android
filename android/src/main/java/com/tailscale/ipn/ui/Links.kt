@@ -25,4 +25,8 @@ object Links {
   const val TAILDROP_KB_URL = "https://tailscale.com/kb/1106/taildrop"
   const val TAILFS_KB_URL = "https://tailscale.com/kb/1106/taildrop"
   const val SUBNET_ROUTERS_KB_URL = "https://tailscale.com/kb/1019/subnets"
+
+  // The project Headlink is derived from. Linked from the About screen so the
+  // attribution there points somewhere, rather than only asserting provenance.
+  const val UPSTREAM_PROJECT_URL = "https://github.com/tailscale/tailscale-android"
 }

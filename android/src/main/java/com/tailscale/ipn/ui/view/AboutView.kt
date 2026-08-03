@@ -97,6 +97,9 @@ fun AboutView(backToSettings: BackNavigation) {
               }
 
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // The attribution above asserts where Headlink comes from; this
+            // link is what lets someone go and check.
+            OpenURLButton(stringResource(R.string.about_view_upstream), Links.UPSTREAM_PROJECT_URL)
             OpenURLButton(stringResource(R.string.acknowledgements), Links.LICENSES_URL)
             OpenURLButton(stringResource(R.string.privacy_policy), Links.PRIVACY_POLICY_URL)
             OpenURLButton(stringResource(R.string.terms_of_service), Links.TERMS_URL)
