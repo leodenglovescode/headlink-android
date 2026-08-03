@@ -401,7 +401,7 @@ checkandroidsdk: ## Check that Android SDK is installed
 		echo -e "\n\tERROR: Android SDK not installed.\n\
 		\tANDROID_HOME=$(ANDROID_HOME)\n\
 		\tANDROID_SDK_ROOT=$(ANDROID_SDK_ROOT)\n\n\
-		See README.md for instructions on how to install the prerequisites.\n"; exit 1)
+		See docs/building.md for instructions on how to install the prerequisites.\n"; exit 1)
 
 .PHONY: go-test                                                                                                                                                                                                 
   go-test: ## Run the Go tests (excludes packages requiring Android NDK)                                                                                                                                                                                     
