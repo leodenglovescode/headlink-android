@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - "release-branch/*"
+    tags:
+      # a tagged build is additionally published to the Releases page
+      - "v*"
   pull_request:
     # all PRs on all branches
   workflow_dispatch:
@@ -13,6 +16,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Needed only to create a Release; everything else in this job reads.
+    permissions:
+      contents: write
 
     if: "!contains(github.event.head_commit.message, '[ci skip]')"
 
@@ -116,6 +123,48 @@ jobs:
           path: headlink-release.apk
           retention-days: 30
           if-no-files-found: error
+
+      # A tagged build also becomes a Release, so the APK gets a permanent
+      # public URL a phone browser can install from directly. Workflow
+      # artifacts cannot serve that purpose: they are zipped, they expire, and
+      # downloading one requires a GitHub login.
+      #
+      # LICENSE ships next to the APK because BSD-3-Clause requires binary
+      # redistributions to reproduce the copyright notice and disclaimer in the
+      # materials provided with the distribution. The notes carry the same
+      # notice inline, and the "not an official Tailscale application" line is
+      # the no-endorsement condition.
+      - name: Publish release
+        if: steps.signing.outputs.available == 'true' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Version the asset so downloads are self-identifying once saved.
+          cp headlink-release.apk "headlink-$TAG.apk"
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          Signed release APK for \`$TAG\`. Install it directly on the device;
+          it is signed with the Headlink release key, so it updates an existing
+          install in place.
+
+          ---
+
+          Headlink is an independent fork of the open-source
+          [Tailscale Android client](https://github.com/tailscale/tailscale-android),
+          adapted as a client for private Headscale deployments.
+          **It is not an official Tailscale application and is not affiliated
+          with or endorsed by Tailscale Inc.**
+
+          Portions Copyright (c) 2020 Tailscale & AUTHORS. All rights reserved.
+          Used under the BSD-3-Clause licence, reproduced in the \`LICENSE\`
+          file attached to this release. This software is provided "as is",
+          without warranty of any kind.
+          EOF
+          gh release create "$TAG" \
+            --title "Headlink $TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            "headlink-$TAG.apk" \
+            LICENSE
 
       - name: Remove signing key
         if: always()
