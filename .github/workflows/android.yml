@@ -48,22 +48,49 @@ jobs:
       # on every run and could not update an existing install.
       - name: Check for signing key
         id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HEADLINK_KEYSTORE_BASE64 }}
         run: |
-          if [ -n "${{ secrets.HEADLINK_KEYSTORE_BASE64 }}" ]; then
+          if [ -n "$KEYSTORE_BASE64" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "::notice::No signing key configured; building a debug APK and not publishing it."
           fi
 
+      # The secret is read through the environment rather than interpolated into
+      # the script: interpolation would break on any shell metacharacter and
+      # would put the value in the generated script itself. Whitespace is
+      # stripped because the usual way to produce the secret — piping `base64`
+      # into the clipboard — wraps its output at 76 columns.
       - name: Decode signing key
         if: steps.signing.outputs.available == 'true'
-        run: echo "${{ secrets.HEADLINK_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/headlink.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HEADLINK_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.HEADLINK_KEYSTORE_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/signing.jks"
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$keystore"; then
+            echo "::error::HEADLINK_KEYSTORE_BASE64 is not valid base64. Re-create it with: base64 -i <keystore>.jks | tr -d '\\n' | gh secret set HEADLINK_KEYSTORE_BASE64"
+            exit 1
+          fi
+          # base64 -d can exit 0 having written nothing, and a keystore is never
+          # empty, so an empty file means the secret was not a keystore at all.
+          if [ ! -s "$keystore" ]; then
+            echo "::error::HEADLINK_KEYSTORE_BASE64 decoded to an empty file."
+            exit 1
+          fi
+          # Fail here, with a clear message, rather than inside Gradle.
+          if ! keytool -list -keystore "$keystore" \
+                -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "::error::The decoded file is not a keystore, or HEADLINK_KEYSTORE_PASSWORD is wrong."
+            exit 1
+          fi
 
       - name: Build signed release APK
         if: steps.signing.outputs.available == 'true'
         env:
-          HEADLINK_KEYSTORE_PATH: ${{ runner.temp }}/headlink.jks
+          HEADLINK_KEYSTORE_PATH: ${{ runner.temp }}/signing.jks
           HEADLINK_KEYSTORE_PASSWORD: ${{ secrets.HEADLINK_KEYSTORE_PASSWORD }}
           HEADLINK_KEY_ALIAS: ${{ secrets.HEADLINK_KEY_ALIAS }}
           HEADLINK_KEY_PASSWORD: ${{ secrets.HEADLINK_KEY_PASSWORD }}
@@ -92,4 +119,4 @@ jobs:
 
       - name: Remove signing key
         if: always()
-        run: rm -f "$RUNNER_TEMP/headlink.jks"
+        run: rm -f "$RUNNER_TEMP/signing.jks"
